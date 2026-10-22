@@ -1,0 +1,3224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Red Lens | Hardware Lab Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+ * styles.css - hardware simulator UI. White canvas, blue and gray theme.
+ * ========================================================================== */
+:root {
+  --white: #fff; --mist: #f5f7fa; --ink: #1b2733; --slate: #5b6b7c; --line: #dde3ea;
+  --blue: #1f5fbf; --navy: #0f3a7a; --sky: #2b8ce6; --green: #1e9e6a; --amber: #d98e04; --red: #d64545;
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --pulse: 0; color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--mist); color: var(--ink); font: 400 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+[hidden] { display: none !important; }
+
+/* ---- toolbar ---------------------------------------------------------- */
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 10px 20px; background: var(--white); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 11px; }
+.logo { width: 32px; height: 32px; }
+.brand h1 { font-size: 16px; font-weight: 600; color: var(--navy); letter-spacing: -0.01em; }
+.brand p { color: var(--slate); font-size: 12px; }
+.sim-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sim-btn { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--blue); background: var(--blue); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; transition: background .15s; }
+.sim-btn:hover { background: var(--navy); }
+.sim-btn svg { fill: currentColor; }
+.sim-btn .ic-stop { display: none; } .sim-btn.stop .ic-play { display: none; } .sim-btn.stop .ic-stop { display: block; }
+.sim-btn.stop { background: var(--white); color: var(--red); border-color: #e3b0b0; }
+.sim-btn.stop:hover { background: #fbeeee; }
+.sim-btn.ghost { background: var(--white); color: var(--navy); border-color: #c4cfdb; font-weight: 500; }
+.sim-btn.ghost:hover { background: var(--mist); }
+.speed { display: inline-flex; align-items: center; gap: 6px; color: var(--slate); font-size: 12.5px; }
+.speed select, .controls select { border: 1px solid #c4cfdb; border-radius: 8px; padding: 5px 8px; background: var(--white); color: var(--ink); }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 500; border: 1px solid var(--line); background: var(--mist); color: var(--slate); }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: #aab5c1; }
+.pill.run { color: #0f7a50; background: #e6f6ef; border-color: #bfe6d3; } .pill.run i { background: var(--green); animation: blink 1.4s infinite; }
+.simtime { color: var(--slate); font-size: 12.5px; } .simtime b { font: 500 13px var(--mono); color: var(--navy); margin-left: 4px; }
+
+.notice { display: flex; align-items: flex-start; gap: 10px; padding: 8px 20px; background: #eef4fc; color: var(--navy); border-bottom: 1px solid #d6e3f5; font-size: 13px; }
+.notice svg { flex: none; margin-top: 2px; color: var(--blue); }
+
+/* ---- stage layout ------------------------------------------------------ */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 20px; padding: 16px 20px 28px; max-width: 1560px; margin: 0 auto; align-items: start; }
+.workspace { min-width: 0; display: grid; gap: 16px; }
+.btn { border: 1px solid #c4cfdb; background: var(--white); color: var(--navy); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 13px; transition: background .15s, border-color .15s; }
+.btn:hover { background: var(--mist); border-color: var(--blue); }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; } .btn.primary:hover { background: var(--navy); }
+.btn.sm { padding: 3px 9px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---- circuit canvas ----------------------------------------------------- */
+.canvas-card { background: var(--white); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.canvas-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+.canvas-head h2 { font-size: 13px; font-weight: 600; color: var(--navy); }
+.canvas-head p { color: var(--slate); font-size: 12.5px; flex: 1; min-width: 220px; }
+.nets { display: flex; gap: 12px; list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--slate); }
+.nets i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.circuit-wrap { position: relative; aspect-ratio: 1000 / 600; background: var(--white); }
+#circuit { display: block; width: 100%; height: 100%; }
+#oled { position: absolute; left: 67.2%; top: 10.33%; width: 25.6%; height: 21.33%; image-rendering: pixelated; border-radius: 2px; pointer-events: none; }
+
+#circuit text { font-family: var(--font); user-select: none; }
+.wire { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
+.flow { fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 2 12; opacity: 0; }
+.flow.on { opacity: .95; animation: dash .7s linear infinite; } .flow.on.slow { animation-duration: 1.5s; }
+@keyframes dash { to { stroke-dashoffset: -14; } }
+.junction { fill: #5b6b7c; }
+.flag path { fill: none; stroke: #5b6b7c; stroke-width: 1.7; stroke-linecap: round; }
+.flag.red path { stroke: var(--red); } .flag.red circle { fill: var(--red); }
+.flag-t { font-size: 9.5px; fill: var(--red); font-weight: 500; }
+.tag { font-size: 9.5px; fill: #8795a5; } .label { font-size: 12px; font-weight: 500; fill: var(--slate); }
+.res { fill: #ead9a8; stroke: #a08c55; stroke-width: 1; }
+
+.part { cursor: pointer; }
+.outline { fill: transparent; stroke: transparent; stroke-width: 1.6; }
+.part:hover .outline { stroke: #9db9e0; stroke-dasharray: 5 4; }
+.part.sel .outline { stroke: var(--blue); stroke-dasharray: 5 4; fill: rgba(31, 95, 191, .035); }
+
+.pcb-esp { fill: #17324f; stroke: #0f2338; stroke-width: 1.5; }
+.antenna { fill: none; stroke: #c9a24b; stroke-width: 2.2; stroke-linejoin: round; }
+.shield { fill: #cdd5de; stroke: #9aa6b3; } .shield-t { font-size: 13px; font-weight: 600; fill: #4a5a6b; } .shield-t.s { font-size: 9.5px; font-weight: 500; }
+.usb { fill: #aab4bf; stroke: #7b8794; }
+.pin { fill: #d9b44a; stroke: #a8862c; stroke-width: 1; }
+.pin-t { font-size: 9.5px; fill: #cfe0f3; font-weight: 500; } .pin-t.sm { font-size: 8.5px; } .pin-t.dk { fill: var(--slate); font-size: 10px; }
+.chip-t { font-size: 9px; fill: #cfe0f3; } .chip-t.dk { fill: var(--slate); }
+.pwr { fill: #35495f; } .pwr.on { fill: #3ddc97; filter: drop-shadow(0 0 4px #3ddc97); }
+.pcb-oled { fill: #1a3a63; stroke: #10264a; stroke-width: 1.5; } .bezel { fill: #04070c; }
+.pcb-max { fill: #2a3441; stroke: #1b2430; stroke-width: 1.5; } .pcb-afe { fill: #1f4d3a; stroke: #13352a; stroke-width: 1.5; }
+.win { fill: #11161d; stroke: #4b586a; } .chip { fill: #11161d; stroke: #3b4757; }
+.bpw { fill: #1b2a3a; stroke: #6a85a3; } .bpw-l { stroke: #6a85a3; stroke-width: 1; }
+.opt { fill: #5a6370; transition: fill .15s; } .pd { fill: #7e8da0; }
+.opt.red.emit { fill: #dc3228; } .opt.ir.emit { fill: #8b7bb8; }
+svg.lit .opt.red.emit { filter: drop-shadow(0 0 calc(3px + var(--pulse) * 9px) rgba(255, 70, 60, .95)); }
+svg.lit .opt.ir.emit { filter: drop-shadow(0 0 4px rgba(139, 123, 184, .9)); }
+
+.finger { transform: translateY(-95px); opacity: 0; transition: transform .9s cubic-bezier(.3, .7, .2, 1), opacity .5s; }
+.finger.hint { opacity: 1; animation: bob 1.4s ease-in-out infinite; }
+.finger.down { opacity: 1; transform: translateY(0); animation: none; }
+@keyframes bob { 0%, 100% { transform: translateY(-92px); } 50% { transform: translateY(-68px); } }
+.finger-body { fill: #fff; fill-opacity: .95; stroke: var(--blue); stroke-width: 2.2; } .finger-nail { fill: #eaf1fb; stroke: #9db9e0; stroke-width: 1.4; }
+svg.lit .finger-body { fill: #fff1ee; }
+.hit-g { cursor: pointer; } .hint-t { font-size: 12px; font-weight: 600; fill: var(--blue); opacity: 0; transition: opacity .3s; pointer-events: none; } .hint-t.on { opacity: 1; }
+
+.batt { fill: #3b6aa6; stroke: #274b78; stroke-width: 1.5; } .batt-nub { fill: #274b78; }
+.batt-t { font-size: 11px; font-weight: 600; fill: #fff; } .batt-t.big { font-size: 17px; font-weight: 500; }
+.seg { fill: rgba(255, 255, 255, .22); transition: fill .2s; } .seg.on { fill: #7ee0b0; } .seg.low { fill: #ff9a9a; }
+.bolt { fill: #ffd84a; opacity: 0; } .bolt.on { opacity: 1; }
+.comp { fill: #f3f6fa; stroke: #c4cfdb; }
+.dome-base { fill: #dfe6ee; stroke: #b9c6d4; } .dome { fill: #aeb9c6; }
+.bz-body { fill: #1b2430; } .bz-hole { fill: #5b6b7c; }
+.bzw path { fill: none; stroke: #c4cfdb; stroke-width: 2; stroke-linecap: round; } .bzw.on path { stroke: #7b6aa8; animation: blink .18s infinite alternate; }
+.bzw.on path:nth-child(2) { animation-delay: .06s; } .bzw.on path:nth-child(3) { animation-delay: .12s; }
+.cap-ring { fill: #d3dce6; stroke: #9fb0c2; } .cap { fill: var(--blue); transform-box: fill-box; transform-origin: center; transition: transform .06s; } .cap-g.down .cap { transform: scale(.82); fill: var(--navy); }
+.ble path { fill: none; stroke: #b6c2cf; stroke-width: 2.4; stroke-linecap: round; }
+.ble.on path { stroke: var(--blue); animation: wave 1.2s infinite; } .ble.on path:nth-child(2) { animation-delay: .2s; } .ble.on path:nth-child(3) { animation-delay: .4s; }
+.ble.adv path { stroke: var(--amber); animation: wave 2s infinite; }
+@keyframes wave { 0%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes blink { 50% { opacity: .35; } }
+
+/* ---- lower: dock + inspector -------------------------------------------- */
+.lower { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.dock, .inspector { background: var(--white); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); background: var(--mist); }
+.tab { border: 0; background: transparent; padding: 10px 16px; font-weight: 500; font-size: 13px; color: var(--slate); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab:hover { color: var(--navy); } .tab[aria-selected="true"] { color: var(--navy); background: var(--white); border-bottom-color: var(--blue); }
+.pane { min-height: 330px; }
+.serial { margin: 0; height: 282px; overflow: auto; padding: 10px 14px; background: #0f1b2b; color: #cfe0f3; font: 400 12px/1.6 var(--mono); white-space: pre-wrap; }
+.serial .ts { color: #6f87a3; } .serial .in { color: #8cc4ff; } .serial .ble { color: #86d6b0; }
+.serial-in { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--line); }
+.serial-in .prompt { font: 500 13px var(--mono); color: var(--blue); }
+.serial-in input { flex: 1; min-width: 0; border: 1px solid #c4cfdb; border-radius: 8px; padding: 6px 10px; font: 400 12.5px var(--mono); background: var(--white); }
+.monitor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.monitor-head .hint { color: var(--slate); font-size: 12.5px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--slate); }
+.legend .k::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.legend .red::before { background: #c0392b; } .legend .ir::before { background: #6b7a8c; } .legend .filt::before { background: var(--blue); }
+.canvas-wrap { position: relative; height: 230px; background: #fbfcfe; }
+.canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; background: rgba(255, 255, 255, .78); color: var(--slate); font-weight: 500; transition: opacity .25s; }
+.overlay.hide { opacity: 0; pointer-events: none; }
+.metrics { display: grid; grid-template-columns: repeat(5, 1fr); margin: 0; border-top: 1px solid var(--line); }
+.metrics div { padding: 8px 14px; border-right: 1px solid var(--line); } .metrics div:last-child { border-right: 0; }
+.metrics dt { color: var(--slate); font-size: 12px; } .metrics dd { margin: 1px 0 0; font-weight: 500; color: var(--navy); font-variant-numeric: tabular-nums; }
+.log { margin: 0; height: 330px; overflow: auto; padding: 12px 14px; background: var(--mist); font: 400 12px/1.6 var(--mono); color: #33465a; white-space: pre-wrap; }
+
+.inspector { padding: 14px 16px 16px; }
+.inspector h3 { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 10px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0 0 12px; font-size: 12.5px; }
+.kv dt { color: var(--slate); } .kv dd { margin: 0; text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.note { color: var(--slate); font-size: 12.5px; margin: 0 0 10px; }
+.controls { display: grid; gap: 10px; }
+.controls label { display: grid; gap: 4px; font-size: 12.5px; color: var(--slate); } .controls output { float: right; color: var(--navy); font-weight: 500; }
+label.inline { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--slate); }
+.controls input[type=range] { width: 100%; accent-color: var(--blue); }
+
+/* ---- phone ------------------------------------------------------------- */
+.phone-col { position: sticky; top: 12px; }
+.phone { width: 100%; max-width: 372px; margin: 0 auto; height: min(780px, calc(100vh - 28px)); min-height: 560px; display: flex; flex-direction: column; background: var(--white); border: 9px solid #2a3441; border-radius: 38px; overflow: hidden; box-shadow: 0 24px 50px -24px rgba(15, 58, 122, .5); }
+.phone-status { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; padding: 10px 10px 8px; background: var(--white); }
+.phone-scroll { flex: 1; overflow: auto; padding: 4px 16px 18px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--mist); color: var(--slate); font-size: 11.5px; font-weight: 500; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #aab5c1; }
+.chip.ok .dot { background: var(--green); } .chip.busy .dot { background: var(--sky); animation: blink 1s infinite; } .chip.warn .dot { background: var(--amber); } .chip.bad .dot { background: var(--red); }
+#chip-batt { color: var(--navy); } #chip-batt.low { color: var(--red); }
+.app-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 16px; }
+.app-head h2 { font-size: 18px; font-weight: 600; color: var(--navy); letter-spacing: -0.01em; } .app-head p { color: var(--slate); font-size: 12px; }
+
+.stepper { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); list-style: none; margin: 0 0 18px; padding: 14px 0 0; }
+.stepper::before { content: ""; position: absolute; left: 8.3%; right: 8.3%; top: 6px; height: 3px; border-radius: 2px; background: var(--line); }
+.stepper-fill { position: absolute; left: 8.3%; top: 6px; height: 3px; border-radius: 2px; background: var(--blue); width: 0; transition: width .25s linear; }
+.stepper li { position: relative; text-align: center; font-size: 10.5px; color: var(--slate); }
+.stepper li::before { content: ""; position: absolute; left: 50%; top: -14px; width: 11px; height: 11px; margin-left: -5.5px; border-radius: 50%; background: var(--white); border: 2px solid #b9c6d4; z-index: 1; transition: background .2s, border-color .2s; }
+.stepper li.done::before { background: var(--blue); border-color: var(--blue); } .stepper li.now { color: var(--navy); font-weight: 600; }
+.stepper li.now::before { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(31, 95, 191, .18); }
+.stepper li.err { color: var(--red); font-weight: 600; } .stepper li.err::before { border-color: var(--red); background: var(--red); }
+
+.lbl { display: block; color: var(--slate); font-size: 12px; }
+.hb-card { border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+.hb-val { display: flex; align-items: baseline; gap: 8px; margin: 2px 0; }
+#hb-val { font-size: 54px; line-height: 1.05; font-weight: 500; letter-spacing: -0.03em; color: var(--navy); font-variant-numeric: tabular-nums; } #hb-val.prov { color: #7d93b3; }
+.unit { color: var(--slate); font-size: 14px; } .hb-sub { color: var(--slate); font-size: 12px; min-height: 18px; }
+.range { margin-top: 12px; } .range-bar { position: relative; height: 6px; border-radius: 3px; background: var(--line); }
+.range-bar i { position: absolute; top: -4px; width: 4px; height: 14px; border-radius: 2px; background: var(--blue); left: 0; opacity: 0; transition: left .5s ease, opacity .3s; }
+.range-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--slate); margin-top: 6px; }
+.vitals { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--mist); margin-bottom: 16px; }
+.vital { padding: 10px 14px; border-bottom: 1px solid var(--line); } .vital:nth-child(odd) { border-right: 1px solid var(--line); } .vital:nth-last-child(-n+2) { border-bottom: 0; }
+.vital b { display: inline-block; font-size: 24px; font-weight: 500; color: var(--navy); font-variant-numeric: tabular-nums; margin-top: 1px; }
+.vital em { font-style: normal; color: var(--slate); font-size: 12px; margin-left: 5px; }
+.vital:last-child b { font-size: 15px; display: block; } .vital:last-child em { display: block; margin: 1px 0 0; }
+.qbar { display: flex; gap: 4px; margin-top: 5px; } .qbar i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); transition: background .3s; }
+.bar { height: 5px; border-radius: 3px; background: var(--line); margin-top: 7px; overflow: hidden; } .bar i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .2s linear; }
+.hist-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; } .hist-head h3 { font-size: 14px; color: var(--navy); }
+.hist-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.hist-list li { display: grid; grid-template-columns: 62px 70px 1fr auto; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 12.5px; }
+.hist-list li:hover { background: #f0f5fb; } .h-time { color: var(--slate); font-variant-numeric: tabular-nums; } .h-hb { font-weight: 500; color: var(--navy); font-size: 15px; font-variant-numeric: tabular-nums; } .h-hb small { color: var(--slate); font-weight: 400; font-size: 10.5px; } .h-vit { color: var(--slate); font-size: 12px; }
+.qtag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 500; background: var(--mist); border: 1px solid var(--line); }
+.qtag.Excellent { color: #0f7a50; background: #e6f6ef; border-color: #bfe6d3; } .qtag.Good { color: var(--blue); background: #e8f0fb; border-color: #c4d7f2; }
+.qtag.Fair { color: #8a5a00; background: #fdf3de; border-color: #f0dca8; } .qtag.Poor { color: var(--red); background: #fbe9e9; border-color: #f0c4c4; }
+.empty { padding: 14px 2px; color: var(--slate); font-size: 12.5px; }
+.phone-safety { margin-top: 16px; padding: 10px 12px; border-radius: 10px; background: #eef4fc; color: var(--navy); font-size: 11.5px; line-height: 1.45; }
+
+/* ---- modal / toast ----------------------------------------------------- */
+.modal { position: fixed; inset: 0; background: rgba(15, 58, 122, .35); display: grid; place-items: center; padding: 20px; z-index: 50; }
+.modal-box { background: var(--white); border-radius: 14px; width: min(900px, 100%); height: min(88vh, 900px); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .45); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--line); } .modal-head h3 { font-size: 15px; color: var(--navy); }
+.modal iframe { flex: 1; border: 0; width: 100%; background: #fff; }
+.toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); background: var(--navy); color: #fff; padding: 9px 16px; border-radius: 10px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 60; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- responsive -------------------------------------------------------- */
+@media (max-width: 1180px) {
+  .stage { grid-template-columns: 1fr; } .phone-col { position: static; } .phone { height: 720px; }
+  .lower { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .toolbar, .notice { padding-left: 12px; padding-right: 12px; } .stage { padding: 12px; }
+  .nets { display: none; } .metrics { grid-template-columns: repeat(2, 1fr); } .metrics div { border-bottom: 1px solid var(--line); }
+  .phone { border-width: 6px; border-radius: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .finger { transition: none; } .finger.hint { animation: none; transform: translateY(-80px); }
+  .flow.on, .ble.on path, .ble.adv path, .bzw.on path, .pill.run i, .chip.busy .dot { animation: none; }
+  .stepper-fill, .bar i, .range-bar i { transition: none; }
+}
+
+
+/* ==========================================================================
+   HARDWARE LAB WORKBENCH THEME — updated UI
+   Dark instrument console, PCB work area, readable live telemetry.
+   ========================================================================== */
+:root {
+  --white:#151e2b; --mist:#0b111a; --ink:#e7edf5; --slate:#9aaabd; --line:#2a394b;
+  --blue:#3b9cff; --navy:#d7e9ff; --sky:#57b5ff; --green:#39d98a; --amber:#ffc857; --red:#ff6b70;
+  color-scheme:dark;
+}
+body { background:#0b111a; color:#e7edf5; }
+.toolbar { background:#111a26; border-bottom:1px solid #2b3a4c; }
+.brand h1,.simtime b { color:#e7f2ff; }
+.brand p,.speed,.simtime { color:#9aadc2; }
+.sim-btn { background:#1676d2; border-color:#288de8; }
+.sim-btn:hover,.btn.primary:hover { background:#0d5da9; }
+.sim-btn.ghost { background:#172333; color:#dceaff; border-color:#3a4c62; }
+.sim-btn.ghost:hover,.btn:hover { background:#223246; }
+.sim-btn.stop { background:#201923; color:#ff8a8f; border-color:#75414a; }
+.sim-btn.stop:hover { background:#321e27; }
+.speed select,.controls select { background:#101a27; color:#e7edf5; border-color:#3a4b60; }
+.pill { background:#172333; border-color:#34465b; color:#b7c6d8; }
+.pill.run { color:#6ee7ad; background:#10291f; border-color:#22573f; }
+.notice { background:#12253a; color:#c7e4ff; border-color:#284563; }
+.notice svg { color:#59b6ff; }
+.stage { max-width:1700px; }
+.canvas-card,.dock,.phone,.panel,.inspector,.card,.modal-box { background:#111a26; border-color:#2a3a4d; }
+.canvas-head { background:#131f2d; border-color:#2a3a4d; }
+.canvas-head h2,.app-head h2,.hist-head h3,.modal-head h3 { color:#dcecff; }
+.canvas-head p,.nets { color:#a6b7ca; }
+.circuit-wrap { background-color:#101925; background-image:linear-gradient(rgba(93,133,173,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(93,133,173,.07) 1px,transparent 1px); background-size:24px 24px; }
+#circuit text { paint-order:stroke; }
+.label { fill:#b6c7da; }
+.tag { fill:#8197b0; }
+.junction { fill:#9aadc2; }
+.flag path { stroke:#93a7bd; }
+.pin-t.dk,.chip-t.dk { fill:#a7b9ce; }
+.btn { background:#172333; color:#dceaff; border-color:#3a4c62; }
+.btn:hover { background:#223246; border-color:#4a9be8; }
+.btn.primary { background:#1676d2; color:#fff; border-color:#288de8; }
+input,textarea,select { background:#0c1420; color:#e7edf5; border-color:#3a4b60; }
+input::placeholder,textarea::placeholder { color:#73869c; }
+.serial,.terminal,.monitor-output { background:#070c12; color:#a8f0c8; border-color:#2a3a4d; }
+.tabs { background:#0d1520; border-color:#2a3a4d; }
+.tab { color:#a5b7ca; }
+.tab[aria-selected="true"],.tab.active { color:#dcecff; background:#1a2b3e; border-color:#3b9cff; }
+.pane { background:#0f1824; }
+.hb-card { background:#142235; border-color:#304760; border-left-color:#3b9cff; }
+#hb-val { color:#e3f1ff; }
+#hb-val.prov { color:#8ea6c2; }
+.range-bar,.bar,.qbar i { background:#29394c; }
+.vitals { background:#0e1722; border-color:#2b3b4e; }
+.vital { border-color:#2b3b4e; }
+.vital b { color:#e1efff; }
+.hist-list { border-color:#2a3a4d; }
+.hist-list li { border-color:#2a3a4d; }
+.hist-list li:hover { background:#1b2b3d; }
+.h-time,.h-vit,.lbl,.app-head p,.empty { color:#9aadc2; }
+.h-hb { color:#dcecff; }
+.qtag { background:#172333; border-color:#34465b; }
+.qtag.Excellent { color:#6ee7ad; background:#10291f; border-color:#22573f; }
+.qtag.Good { color:#83c5ff; background:#122b43; border-color:#285780; }
+.qtag.Fair { color:#ffd27b; background:#302716; border-color:#66502b; }
+.qtag.Poor { color:#ff9da1; background:#321b23; border-color:#75414a; }
+.phone-safety { background:#12253a; color:#c7e4ff; }
+.stepper::before { background:#304258; }
+.stepper li { color:#8fa3ba; }
+.stepper li::before { background:#111a26; border-color:#53677f; }
+.stepper li.now { color:#dcecff; }
+.stepper li.done::before { background:#3b9cff; border-color:#3b9cff; }
+.modal { background:rgba(2,8,15,.78); }
+.modal-head { border-color:#2a3a4d; }
+.modal iframe { background:#0b111a; }
+.toast { background:#dcecff; color:#102033; }
+@media (max-width:640px) {
+  .toolbar { background:#111a26; }
+  .canvas-head { align-items:flex-start; }
+}
+
+</style>
+</head>
+<body>
+
+<header class="toolbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M16 3 C16 3 6 14 6 20 a10 10 0 0 0 20 0 C26 14 16 3 16 3z" fill="#1f5fbf"/>
+      <path d="M9 19 h4 l2 -4 l3 8 l2 -4 h3" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div><h1>Red Lens · Hardware Lab</h1><p>Live circuit simulation · ESP32 + MAX30102</p></div>
+  </div>
+  <div class="sim-controls">
+    <button type="button" class="sim-btn" id="btn-power"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path class="ic-play" d="M4 2.5v11l9-5.5z"/><rect class="ic-stop" x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg><span>Stop simulation</span></button>
+    <button type="button" class="sim-btn ghost" id="btn-reboot">Restart</button>
+    <label class="speed">Speed
+      <select id="ctl-speed"><option value="1">1x</option><option value="2">2x</option><option value="4">4x</option></select>
+    </label>
+    <span class="pill run" id="sim-pill"><i></i><span>Running</span></span>
+    <span class="simtime" title="Simulated time">Sim time <b id="sim-time">00:00.0</b></span>
+  </div>
+</header>
+
+<div class="notice" role="note">
+  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 6v5M10 13.6v.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  <p id="safety-text"></p>
+</div>
+
+<main class="stage">
+
+  <!-- ============ WORKSPACE: circuit + dock + inspector ============ -->
+  <section class="workspace">
+    <div class="canvas-card">
+      <div class="canvas-head">
+        <h2>Circuit</h2>
+        <p>Click the push button to start a scan &middot; click the finger to place it &middot; click any part to inspect it</p>
+        <ul class="nets">
+          <li><i style="background:#d98e04"></i>SCL</li><li><i style="background:#1e9e6a"></i>SDA</li>
+          <li><i style="background:#d64545"></i>Power / R</li><li><i style="background:#2b8ce6"></i>ADC / B</li>
+        </ul>
+      </div>
+      <div class="circuit-wrap" id="circuit-wrap"></div>
+    </div>
+
+    <div class="lower">
+      <section class="dock" aria-label="Instruments">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="serial" aria-selected="true">Serial monitor</button>
+          <button class="tab" role="tab" data-tab="scope" aria-selected="false">Oscilloscope</button>
+          <button class="tab" role="tab" data-tab="ble" aria-selected="false">Bluetooth log</button>
+        </div>
+
+        <div class="pane" id="pane-serial">
+          <pre class="serial" id="serial-out" aria-live="off"></pre>
+          <form class="serial-in" id="serial-form" autocomplete="off">
+            <span class="prompt">&gt;</span>
+            <input id="serial-in" type="text" placeholder="Type a command: help, scan, status, history, reboot" spellcheck="false">
+            <button type="submit" class="btn">Send</button>
+            <button type="button" class="btn" id="serial-clear">Clear</button>
+          </form>
+        </div>
+
+        <div class="pane" id="pane-scope" hidden>
+          <div class="monitor-head">
+            <span class="hint">Live optical signals over the BLE telemetry stream (50 Hz)</span>
+            <div class="legend"><span class="k red">Raw red</span><span class="k ir">Raw IR</span><span class="k filt">Filtered</span></div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="wave"></canvas>
+            <div class="overlay" id="wave-overlay">Waiting for the device&hellip;</div>
+          </div>
+          <dl class="metrics">
+            <div><dt>Signal stability</dt><dd id="m-stab">--</dd></div>
+            <div><dt>Perfusion index</dt><dd id="m-pi">--</dd></div>
+            <div><dt>SNR</dt><dd id="m-snr">--</dd></div>
+            <div><dt>Red/IR ratio</dt><dd id="m-r">--</dd></div>
+            <div><dt>Finger contact</dt><dd id="m-contact">--</dd></div>
+          </dl>
+        </div>
+
+        <div class="pane" id="pane-ble" hidden>
+          <pre id="ble-log" class="log" aria-live="off"></pre>
+        </div>
+      </section>
+
+      <aside class="inspector" aria-label="Part properties">
+        <h3 id="prop-title">Optical sensor</h3>
+
+        <div class="prop-sec" data-part="esp32" hidden>
+          <dl class="kv" id="kv-esp32"></dl>
+          <p class="note">Bluetooth <b id="prop-ble">--</b></p>
+          <button type="button" class="btn" id="btn-ble-prop">Connect / disconnect phone</button>
+        </div>
+
+        <div class="prop-sec" data-part="oled" hidden>
+          <dl class="kv" id="kv-oled"></dl>
+          <p class="note">The panel is driven by the display module, one 1-bit frame at about 20 fps.</p>
+        </div>
+
+        <div class="prop-sec" data-part="max">
+          <dl class="kv" id="kv-max"></dl>
+          <div class="controls">
+            <label>Virtual subject
+              <select id="ctl-subject">
+                <option value="random">Random</option><option value="low">Lower Hb range</option>
+                <option value="typical">Mid Hb range</option><option value="high">Higher Hb range</option>
+              </select></label>
+            <label>Finger contact
+              <select id="ctl-contact">
+                <option value="auto">Automatic</option><option value="excellent">Excellent fit</option>
+                <option value="fair">Loose fit</option><option value="poor">Poor contact</option>
+              </select></label>
+            <label>Optical front-end
+              <select id="ctl-frontend">
+                <option value="max30102">MAX30102 (integrated)</option><option value="afe4404">BPW34 + AFE4404 (external)</option>
+              </select></label>
+            <label>Finger placement
+              <select id="ctl-finger"><option value="auto">Automatic</option><option value="manual">Manual</option></select></label>
+            <div class="btn-row">
+              <button type="button" class="btn" id="btn-finger">Place finger</button>
+              <button type="button" class="btn" id="btn-shake">Shake finger</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="prop-sec" data-part="led" hidden>
+          <dl class="kv" id="kv-led"></dl>
+          <p class="note">Blue pulse = ready, amber = waiting for finger, cyan = measuring (flashes on each beat), green = done, red = error.</p>
+        </div>
+
+        <div class="prop-sec" data-part="bz" hidden>
+          <dl class="kv" id="kv-bz"></dl>
+          <label class="inline"><input type="checkbox" id="ctl-sound" checked> Play sound through speakers</label>
+        </div>
+
+        <div class="prop-sec" data-part="btn" hidden>
+          <dl class="kv" id="kv-btn"></dl>
+          <button type="button" class="btn primary" id="btn-press">Press button</button>
+        </div>
+
+        <div class="prop-sec" data-part="batt" hidden>
+          <dl class="kv" id="kv-batt"></dl>
+          <div class="controls">
+            <label>Battery level <output id="out-batt">--%</output>
+              <input type="range" id="ctl-batt" min="0" max="100" step="1" value="80"></label>
+            <label class="inline"><input type="checkbox" id="ctl-charge"> USB charger connected</label>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ PHONE (BLE dashboard) ============ -->
+  <aside class="phone-col" aria-label="Mobile dashboard">
+    <div class="phone">
+      <div class="phone-status">
+        <span class="chip" id="chip-state"><i class="dot"></i><span>Starting</span></span>
+        <span class="chip" id="chip-ble"><i class="dot"></i><span>Bluetooth off</span></span>
+        <span class="chip" id="chip-batt"><svg viewBox="0 0 26 12" width="22" height="10" aria-hidden="true"><rect x="0.5" y="0.5" width="22" height="11" rx="2.5" fill="none" stroke="currentColor"/><rect x="23.5" y="3.5" width="2" height="5" rx="1" fill="currentColor"/><rect id="chip-batt-fill" x="2" y="2" width="19" height="8" rx="1.5" fill="currentColor"/></svg><span id="chip-batt-text">--%</span></span>
+      </div>
+      <div class="phone-scroll">
+        <div class="app-head">
+          <div><h2>Hb Research</h2><p id="ble-text">Bluetooth off</p></div>
+          <button type="button" class="btn" id="btn-ble">Connect</button>
+        </div>
+
+        <ol class="stepper" id="stepper" aria-label="Scan progress">
+          <li data-step="0">Ready</li><li data-step="1">Finger</li><li data-step="2">Pulse</li>
+          <li data-step="3">Measure</li><li data-step="4">Estimate</li><li data-step="5">Done</li>
+          <span class="stepper-fill" id="stepper-fill"></span>
+        </ol>
+
+        <div class="hb-card">
+          <div class="lbl">Estimated hemoglobin</div>
+          <div class="hb-val"><span id="hb-val">--.-</span><span class="unit">g/dL</span></div>
+          <div class="hb-sub" id="hb-sub">Demonstration estimate only</div>
+          <div class="range" aria-hidden="true">
+            <div class="range-bar"><i id="range-mark"></i></div>
+            <div class="range-scale"><span>9.0</span><span>17.5</span></div>
+          </div>
+        </div>
+
+        <div class="vitals">
+          <div class="vital"><span class="lbl">Heart rate</span><b id="hr-val">--</b><em>BPM</em></div>
+          <div class="vital"><span class="lbl">SpO&#8322;</span><b id="spo2-val">--</b><em>%</em></div>
+          <div class="vital"><span class="lbl">Signal quality</span><b id="q-val">--</b>
+            <div class="qbar" id="qbar"><i></i><i></i><i></i><i></i></div></div>
+          <div class="vital"><span class="lbl">Scan status</span><b id="status-val">Ready</b><em id="status-sub">Press the button on the circuit</em>
+            <div class="bar"><i id="status-bar"></i></div></div>
+        </div>
+
+        <div class="hist-head">
+          <h3>Scan history</h3>
+          <div class="btn-row">
+            <button type="button" class="btn sm" id="btn-clear">Clear</button>
+            <button type="button" class="btn sm primary" id="btn-export">Export report</button>
+          </div>
+        </div>
+        <ul class="hist-list" id="hist-body"></ul>
+        <p class="empty" id="hist-empty">No scans yet.</p>
+
+        <p class="phone-safety" id="foot-safety"></p>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- Report modal -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="Report preview">
+    <div class="modal-head">
+      <h3>Report preview</h3>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="rep-html">Download report</button>
+        <button type="button" class="btn" id="rep-csv">Download CSV</button>
+        <button type="button" class="btn" id="rep-print">Print</button>
+        <button type="button" class="btn" id="rep-close">Close</button>
+      </div>
+    </div>
+    <iframe id="rep-frame" title="Report preview"></iframe>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="sr-only" id="live" aria-live="polite"></div>
+
+<script>
+/* ==========================================================================
+ * config.js  -  Shared configuration, virtual clock and helpers
+ *
+ * Everything lives under one global namespace (window.HbSim) and is loaded
+ * with plain <script> tags, so the project works by double-clicking
+ * index.html (ES modules are blocked on file:// in most browsers).
+ *
+ * RESEARCH / EDUCATIONAL SIMULATION ONLY. Not a medical device.
+ * ========================================================================== */
+window.HbSim = window.HbSim || {};
+
+(function (ns) {
+  'use strict';
+
+  ns.Config = {
+    device: {
+      name: 'Hb Research Prototype',   // 21 chars: exactly one OLED row
+      bleName: 'HB-PROTO-01',
+      firmware: 'v0.9.3-sim',
+      hardware: 'ESP32 DevKit V1',
+    },
+
+    sensor: {
+      fs: 100,          // MAX30102 sample rate (samples / second)
+      redNm: 660,
+      irNm: 880,
+      adcBits: 18,
+    },
+
+    // All durations are in *virtual* milliseconds (see ns.clock).
+    scan: {
+      bootMs: 2800,
+      placeTimeoutMs: 12000,   // give up if no finger is detected
+      settleMs: 2500,          // let filters + pressure settle
+      pulseTimeoutMs: 8000,    // give up if no pulse is found while settling
+      acquireMs: 14000,        // measurement window
+      processMs: 1800,         // "Estimating Hb..." stage
+      minValidFraction: 0.55,  // fraction of 1 s windows that must be usable
+      maxFingerLosses: 2,
+      historyLimit: 30,
+    },
+
+    hbRange: { min: 9.0, max: 17.5 },   // demonstration range (g/dL)
+
+    safety:
+      'This project is a research and educational simulation. The Hb value shown ' +
+      'is an estimated demonstration only and must not be used for medical ' +
+      'diagnosis or treatment.',
+  };
+
+  /* Virtual clock. main.js advances `now` each animation frame by
+   * (real dt * scale), so the whole device can run at 1x, 2x or 4x speed. */
+  ns.clock = { now: 0, scale: 1 };
+
+  ns.util = {
+    clamp: function (v, a, b) { return Math.min(b, Math.max(a, v)); },
+    lerp: function (a, b, t) { return a + (b - a) * t; },
+    rand: function (a, b) {
+      if (a === undefined) { a = 0; b = 1; }
+      return a + Math.random() * (b - a);
+    },
+    /* Standard normal random number (Box-Muller). */
+    randn: function () {
+      var u = 0, v = 0;
+      while (u === 0) u = Math.random();
+      while (v === 0) v = Math.random();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    },
+    mean: function (a) {
+      if (!a.length) return 0;
+      var s = 0; for (var i = 0; i < a.length; i++) s += a[i];
+      return s / a.length;
+    },
+    std: function (a) {
+      if (a.length < 2) return 0;
+      var m = ns.util.mean(a), s = 0;
+      for (var i = 0; i < a.length; i++) s += (a[i] - m) * (a[i] - m);
+      return Math.sqrt(s / (a.length - 1));
+    },
+    median: function (a) {
+      if (!a.length) return 0;
+      var b = a.slice().sort(function (x, y) { return x - y; });
+      var m = b.length >> 1;
+      return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2;
+    },
+    pad2: function (n) { return (n < 10 ? '0' : '') + n; },
+    clockTime: function (d) {
+      var p = ns.util.pad2;
+      return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    },
+    round: function (v, digits) {
+      var k = Math.pow(10, digits || 0);
+      return Math.round(v * k) / k;
+    },
+  };
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * storage.js  -  Non-volatile storage (emulates ESP32 NVS / Preferences)
+ *
+ * Uses localStorage when the page is allowed to, and silently falls back to
+ * memory when it is not (sandboxed previews, private mode, etc.).
+ *
+ * On real hardware: replace with Preferences.h / LittleFS.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+
+  function NvStore(prefix) {
+    this.prefix = prefix || 'hbsim.';
+    this.mem = {};
+    this.persistent = false;
+    try {
+      var ls = window.localStorage;
+      ls.setItem(this.prefix + '__probe', '1');
+      ls.removeItem(this.prefix + '__probe');
+      this.persistent = true;
+    } catch (e) { /* memory only */ }
+  }
+
+  NvStore.prototype.get = function (key, fallback) {
+    try {
+      var raw = this.persistent ? window.localStorage.getItem(this.prefix + key) : this.mem[key];
+      if (raw === null || raw === undefined) return fallback;
+      return JSON.parse(raw);
+    } catch (e) { return fallback; }
+  };
+
+  NvStore.prototype.set = function (key, value) {
+    var raw = JSON.stringify(value);
+    this.mem[key] = raw;
+    if (!this.persistent) return true;
+    try { window.localStorage.setItem(this.prefix + key, raw); return true; }
+    catch (e) { return false; }   // quota exceeded -> memory copy still valid
+  };
+
+  NvStore.prototype.remove = function (key) {
+    delete this.mem[key];
+    if (this.persistent) { try { window.localStorage.removeItem(this.prefix + key); } catch (e) {} }
+  };
+
+  ns.NvStore = NvStore;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * sensor.js  -  Optical sensor sources (MAX30102 simulation + real adapter)
+ *
+ * SENSOR SOURCE INTERFACE (duck-typed). Anything with these members can be
+ * plugged into the firmware in main.js:
+ *
+ *   fs                       sample rate in Hz
+ *   active                   true while the AFE is powered
+ *   begin()                  power up / start a new scan
+ *   end()                    power down
+ *   pull(nowMs)              -> [{ t, red, ir }]  samples since last call
+ *   setFingerPresent(bool)   (simulation only; real sensors ignore it)
+ *
+ * The simulated source uses a simple Beer-Lambert optical model so that the
+ * red/IR DC levels depend on hemoglobin concentration, and the pulsatile
+ * (AC) parts follow a PPG waveform whose red/IR ratio encodes SpO2.
+ * That lets the rest of the pipeline run on data with realistic structure.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util;
+
+  /* ---- PPG pulse shape (one beat, 512-point lookup table) -------------- */
+  function gauss(x, mu, s) { var d = (x - mu) / s; return Math.exp(-0.5 * d * d); }
+  var LUT_N = 512, LUT = new Float64Array(LUT_N), LUT_MEAN = 0;
+  (function buildShape() {
+    var min = Infinity, max = -Infinity, i, v;
+    for (i = 0; i < LUT_N; i++) {
+      var p = i / LUT_N;
+      v = gauss(p, 0.20, 0.085) + 0.38 * gauss(p, 0.56, 0.11);   // systolic peak + dicrotic wave
+      LUT[i] = v; if (v < min) min = v; if (v > max) max = v;
+    }
+    var sum = 0;
+    for (i = 0; i < LUT_N; i++) { LUT[i] = (LUT[i] - min) / (max - min); sum += LUT[i]; }
+    LUT_MEAN = sum / LUT_N;                                       // peak-to-peak = 1
+  })();
+  function shapeAt(p) {
+    var x = p * LUT_N, i = Math.floor(x) % LUT_N, f = x - Math.floor(x);
+    return LUT[i] * (1 - f) + LUT[(i + 1) % LUT_N] * f;
+  }
+
+  /* ---- Optical model constants (tissue + hemoglobin absorption) --------
+   * DC_ch = K_ch * exp(-(A_ch + E_ch * Hb * L))
+   * Hb is in g/dL, L is a per-finger path-length factor (~1.0 +/- 4 %).
+   * Red (660 nm) is absorbed more strongly by Hb than IR (880 nm) in this
+   * toy model, so ln(DC_ir / DC_red) rises linearly with Hb.            */
+  var OPTICS = { Ki: 212200, Kr: 201850, Ai: 0.30, Ar: 0.30, Ei: 0.020, Er: 0.055 };
+
+  /* ---- Finger contact quality presets ---------------------------------- */
+  var CONTACT = {
+    excellent: { noise: 0.00012, piScale: 1.00, burstRate: 0.00, burstAmp: 0.0, leak: 0 },
+    good:      { noise: 0.00030, piScale: 0.90, burstRate: 0.01, burstAmp: 0.8, leak: 300 },
+    fair:      { noise: 0.00085, piScale: 0.60, burstRate: 0.05, burstAmp: 1.4, leak: 1500 },
+    poor:      { noise: 0.00220, piScale: 0.35, burstRate: 0.25, burstAmp: 3.0, leak: 5000 },
+  };
+  var FRONT_ENDS = {
+    max30102: { label: 'MAX30102 (integrated)', noiseScale: 1.0, leakScale: 1.0 },
+    afe4404:  { label: 'BPW34 + AFE4404 (external)', noiseScale: 0.55, leakScale: 0.6 },
+  };
+
+  function pickAutoContact() {
+    var r = Math.random();
+    if (r < 0.50) return 'excellent';
+    if (r < 0.85) return 'good';
+    if (r < 0.97) return 'fair';
+    return 'poor';
+  }
+
+  function newSubject(preset) {
+    var hb;
+    if (preset === 'low') hb = U.rand(9.0, 10.8);
+    else if (preset === 'typical') hb = U.rand(12.4, 14.6);
+    else if (preset === 'high') hb = U.rand(15.6, 17.4);
+    else hb = U.clamp(13.4 + 2.0 * U.randn(), 9.0, 17.5);
+    return {
+      hb: hb,
+      hr: U.clamp(72 + 9 * U.randn(), 61, 98),
+      spo2: U.clamp(97.6 + 1.0 * U.randn(), 95.5, 99.3),
+      pi: U.clamp(0.016 * Math.exp(0.35 * U.randn()), 0.007, 0.032),  // AC/DC at IR
+      L: U.clamp(1 + 0.04 * U.randn(), 0.9, 1.1),
+      respHz: U.rand(0.2, 0.3),
+    };
+  }
+
+  /* ======================================================================
+   * SimulatedMAX30102
+   * ==================================================================== */
+  function SimulatedMAX30102() {
+    this.fs = ns.Config.sensor.fs;
+    this.name = 'MAX30102';
+    this.options = { subject: 'random', contact: 'auto', frontEnd: 'max30102' };
+    this.active = false;
+    this.fingerTarget = false;
+    this.coupling = 0;           // 0 = no finger, 1 = fully covered
+    this.nextT = null;
+    this._resetState();
+    this.subject = newSubject('random');
+    this.contactMode = 'excellent';
+    this.cm = CONTACT.excellent;
+    this.fe = FRONT_ENDS.max30102;
+  }
+
+  SimulatedMAX30102.prototype._resetState = function () {
+    this.t = 0;                         // sensor seconds since begin()
+    this.phase = Math.random();
+    this.hrWander = 0;
+    this.contactT = 0;
+    this.motion = null;
+    this.ph1 = Math.random() * 6.28; this.ph2 = Math.random() * 6.28;
+  };
+
+  SimulatedMAX30102.prototype.setOptions = function (o) {
+    for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) this.options[k] = o[k];
+  };
+
+  SimulatedMAX30102.prototype.frontEndLabel = function () { return this.fe.label; };
+
+  /* Power up the AFE and pick a new virtual subject for this scan. */
+  SimulatedMAX30102.prototype.begin = function () {
+    this.subject = newSubject(this.options.subject);
+    this.contactMode = this.options.contact === 'auto' ? pickAutoContact() : this.options.contact;
+    this.cm = CONTACT[this.contactMode];
+    this.fe = FRONT_ENDS[this.options.frontEnd] || FRONT_ENDS.max30102;
+    this._resetState();
+    this.coupling = this.fingerTarget ? 1 : 0;
+    this.nextT = null;
+    this.active = true;
+  };
+
+  SimulatedMAX30102.prototype.end = function () { this.active = false; this.nextT = null; };
+
+  SimulatedMAX30102.prototype.setFingerPresent = function (on) { this.fingerTarget = !!on; };
+  SimulatedMAX30102.prototype.isFingerPresent = function () { return this.fingerTarget; };
+  SimulatedMAX30102.prototype.getCoupling = function () { return this.coupling; };
+
+  /* Trigger a motion artifact (user shakes / presses the finger). */
+  SimulatedMAX30102.prototype.injectMotion = function (ms, amp) {
+    this.motion = { start: this.t, dur: (ms || 1500) / 1000, amp: amp || 3.0, f: U.rand(2.0, 3.5) };
+  };
+
+  /* Hidden "truth" of the virtual subject - only used to show how far the
+   * estimate is from the simulated reference (educational). */
+  SimulatedMAX30102.prototype.getGroundTruth = function () {
+    return { hb: this.subject.hb, hr: this.subject.hr, spo2: this.subject.spo2, contact: this.contactMode };
+  };
+
+  SimulatedMAX30102.prototype.pull = function (now) {
+    if (!this.active) { this.nextT = null; return []; }
+    if (this.nextT === null) this.nextT = now;
+    var out = [], guard = 0, step = 1000 / this.fs;
+    while (this.nextT <= now && guard++ < 400) {
+      out.push(this._sample(this.nextT));
+      this.nextT += step;
+    }
+    if (guard >= 400) this.nextT = now + step;
+    return out;
+  };
+
+  SimulatedMAX30102.prototype._sample = function (tMs) {
+    var dt = 1 / this.fs, s = this.subject, cm = this.cm, fe = this.fe;
+    this.t += dt;
+    var tt = this.t;
+
+    // finger coupling (first-order lag toward target)
+    var tau = this.fingerTarget ? 0.18 : 0.12;
+    this.coupling += (((this.fingerTarget ? 1 : 0) - this.coupling) * (1 - Math.exp(-dt / tau)));
+    this.contactT = this.coupling > 0.5 ? this.contactT + dt : 0;
+
+    // heart rate with respiratory sinus arrhythmia + slow wander (OU process)
+    this.hrWander += (-this.hrWander * 0.1 * dt) + 0.35 * Math.sqrt(dt) * U.randn();
+    var hr = s.hr + 2.5 * Math.sin(2 * Math.PI * 0.25 * tt) + this.hrWander;
+    this.phase = (this.phase + hr * dt / 60) % 1;
+    var shape = shapeAt(this.phase) - LUT_MEAN;
+    var shapeR = shapeAt((this.phase + 0.995) % 1) - LUT_MEAN;   // tiny channel skew
+
+    // optical DC levels from the Hb model
+    var dcIr = OPTICS.Ki * Math.exp(-(OPTICS.Ai + OPTICS.Ei * s.hb * s.L));
+    var dcRed = OPTICS.Kr * Math.exp(-(OPTICS.Ar + OPTICS.Er * s.hb * s.L));
+
+    // SpO2 -> R ratio (empirical SpO2 = 110 - 25 R)
+    var spo2 = s.spo2 + 0.3 * Math.sin(2 * Math.PI * 0.03 * tt);
+    var R = (110 - spo2) / 25;
+    var piIr = s.pi * cm.piScale, piRed = piIr * R;
+
+    // slow physiological / mechanical modulation (common to both channels)
+    var settle = 0.04 * Math.exp(-this.contactT / 1.2);          // pressure settling
+    var common = 1 + 0.004 * Math.sin(2 * Math.PI * s.respHz * tt + this.ph1) +
+                 0.003 * Math.sin(2 * Math.PI * 0.05 * tt + this.ph2) + settle;
+
+    // motion artifacts (random bursts + user-injected)
+    var mot = 0, noiseK = 1;
+    if (!this.motion && cm.burstRate > 0 && this.coupling > 0.9 && Math.random() < cm.burstRate * dt) {
+      this.motion = { start: tt, dur: U.rand(0.5, 1.4), amp: cm.burstAmp, f: U.rand(2.0, 3.5) };
+    }
+    if (this.motion) {
+      var tb = tt - this.motion.start;
+      if (tb >= this.motion.dur) this.motion = null;
+      else {
+        mot = this.motion.amp * s.pi * Math.sin(Math.PI * tb / this.motion.dur) *
+              Math.sin(2 * Math.PI * this.motion.f * tb);
+        noiseK = 4;
+      }
+    }
+
+    var nz = cm.noise * fe.noiseScale * noiseK;
+    var leak = cm.leak * fe.leakScale;
+    var irFinger = dcIr * common * (1 - piIr * shape + mot) + leak + nz * dcIr * U.randn();
+    var redFinger = dcRed * common * (1 - piRed * shapeR + mot * 0.9) + leak * 0.8 + nz * dcRed * U.randn();
+
+    // no-finger ambient level (a few thousand counts), blended by coupling
+    var ambR = 1400 + 25 * U.randn(), ambI = 1900 + 25 * U.randn();
+    var c = this.coupling;
+    var red = ambR * (1 - c) + redFinger * c;
+    var ir = ambI * (1 - c) + irFinger * c;
+    var max = Math.pow(2, ns.Config.sensor.adcBits) - 1;
+    return { t: tMs, red: U.clamp(Math.round(red), 0, max), ir: U.clamp(Math.round(ir), 0, max) };
+  };
+
+  /* ======================================================================
+   * WebSerialSensor  -  skeleton for REAL hardware (Chrome / Edge)
+   *
+   * Flash the ESP32 with a sketch that prints one line per sample:
+   *     <red>,<ir>\n          (e.g. "71203,118940")
+   * at 100 sps (MAX30105 library: particleSensor.getRed() / getIR()).
+   * Then in main.js replace
+   *     new HbSim.sensors.SimulatedMAX30102()
+   * with
+   *     new HbSim.sensors.WebSerialSensor()
+   * and call sensor.connect() from a button click (needs a user gesture).
+   * ==================================================================== */
+  function WebSerialSensor() {
+    this.fs = ns.Config.sensor.fs;
+    this.name = 'MAX30102 (serial)';
+    this.active = false;
+    this.buf = [];
+    this.port = null;
+    this.fingerTarget = false;
+  }
+  WebSerialSensor.prototype.connect = async function () {
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({ baudRate: 115200 });
+    var self = this, decoder = new TextDecoderStream();
+    this.port.readable.pipeTo(decoder.writable);
+    var reader = decoder.readable.getReader(), rest = '';
+    (async function loop() {
+      for (;;) {
+        var r = await reader.read();
+        if (r.done) break;
+        var lines = (rest + r.value).split('\n'); rest = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          var p = lines[i].trim().split(',');
+          var red = parseInt(p[0], 10), ir = parseInt(p[1], 10);
+          if (self.active && isFinite(red) && isFinite(ir)) self.buf.push({ t: ns.clock.now, red: red, ir: ir });
+        }
+      }
+    })();
+  };
+  WebSerialSensor.prototype.begin = function () { this.active = true; this.buf = []; };
+  WebSerialSensor.prototype.end = function () { this.active = false; };
+  WebSerialSensor.prototype.pull = function () { var o = this.buf; this.buf = []; return o; };
+  WebSerialSensor.prototype.setFingerPresent = function () { /* a real finger does this */ };
+  WebSerialSensor.prototype.setOptions = function () {};
+  WebSerialSensor.prototype.injectMotion = function () {};
+  WebSerialSensor.prototype.frontEndLabel = function () { return 'MAX30102 (serial)'; };
+  WebSerialSensor.prototype.getGroundTruth = function () { return null; };
+  WebSerialSensor.prototype.isFingerPresent = function () { return false; };
+  WebSerialSensor.prototype.getCoupling = function () { return 0; };
+
+  ns.sensors = { SimulatedMAX30102: SimulatedMAX30102, WebSerialSensor: WebSerialSensor };
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * signal.js  -  Optical signal processing (runs identically on real data)
+ *
+ *   ContactDetector   decides when a finger is on the sensor and stable
+ *   SignalProcessor   DC removal, 0.5-5 Hz band-pass, beat detection,
+ *                     heart rate, SpO2 (ratio-of-ratios), signal quality
+ *
+ * Port notes: everything is streaming, O(1) per sample and uses only basic
+ * arithmetic, so it translates directly to C++ on the ESP32.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util;
+
+  ns.QUALITY_LEVELS = ['Poor', 'Fair', 'Good', 'Excellent'];
+  ns.qualityLabel = function (score) {
+    if (score >= 78) return 'Excellent';
+    if (score >= 58) return 'Good';
+    if (score >= 45) return 'Fair';
+    return 'Poor';
+  };
+
+  /* ---- 2nd-order Butterworth-style biquads (RBJ cookbook) -------------- */
+  function biquadCoef(type, fc, fs) {
+    var Q = Math.SQRT1_2, w0 = 2 * Math.PI * fc / fs;
+    var cs = Math.cos(w0), alpha = Math.sin(w0) / (2 * Q), b0, b1, b2;
+    if (type === 'lp') { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = (1 - cs) / 2; }
+    else { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = (1 + cs) / 2; }
+    var a0 = 1 + alpha;
+    return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: -2 * cs / a0, a2: (1 - alpha) / a0 };
+  }
+  function Biquad(c) { this.c = c; this.z1 = 0; this.z2 = 0; }
+  Biquad.prototype.process = function (x) {       // transposed direct form II
+    var c = this.c, y = c.b0 * x + this.z1;
+    this.z1 = c.b1 * x - c.a1 * y + this.z2;
+    this.z2 = c.b2 * x - c.a2 * y;
+    return y;
+  };
+
+  /* ======================================================================
+   * ContactDetector - states: none -> settling -> stable -> lost
+   * ==================================================================== */
+  function ContactDetector() {
+    this.onThreshold = 30000;    // raw IR counts
+    this.offThreshold = 20000;
+    this.reset();
+  }
+  ContactDetector.prototype.reset = function () {
+    this.state = 'none'; this.ema = null; this.ring = []; this.stableRun = 0; this.lowRun = 0;
+  };
+  ContactDetector.prototype.update = function (ir) {
+    if (this.ema === null) this.ema = ir;
+    this.ema += 0.2 * (ir - this.ema);
+    this.ring.push(this.ema);
+    if (this.ring.length > 31) this.ring.shift();
+
+    if (this.state === 'none') {
+      if (this.ema > this.onThreshold) { this.state = 'settling'; this.stableRun = 0; }
+    } else if (this.state === 'settling') {
+      if (this.ema < this.offThreshold) { this.state = 'none'; }
+      else if (this.ring.length > 30) {
+        var change = Math.abs(this.ema - this.ring[0]) / this.ema;     // change over 300 ms
+        this.stableRun = change < 0.01 ? this.stableRun + 1 : 0;
+        if (this.stableRun > 30) this.state = 'stable';
+      }
+    } else if (this.state === 'stable') {
+      this.lowRun = this.ema < this.offThreshold ? this.lowRun + 1 : 0;
+      if (this.lowRun > 40) this.state = 'lost';
+    }
+    return this.state;
+  };
+
+  /* ======================================================================
+   * SignalProcessor
+   * ==================================================================== */
+  function SignalProcessor(fs) {
+    this.fs = fs || 100;
+    this.hpCoef = biquadCoef('hp', 0.5, this.fs);
+    this.lpCoef = biquadCoef('lp', 5.0, this.fs);
+    this.reset();
+  }
+
+  SignalProcessor.prototype.reset = function () {
+    this.n = 0; this.dcR = 0; this.dcI = 0;
+    this.hpR = new Biquad(this.hpCoef); this.lpR = new Biquad(this.lpCoef);
+    this.hpI = new Biquad(this.hpCoef); this.lpI = new Biquad(this.lpCoef);
+    this.rmsR2 = 0; this.rmsI2 = 0; this.noise2 = 0;
+    this.pn1 = 0; this.pn2 = 0;                 // previous normalised IR samples
+    this.f1 = 0; this.f2 = 0;                   // previous filtered IR samples
+    this.lastT = 0; this.lastPeakT = null;
+    this.ibis = []; this.amps = []; this.ampEst = 0; this.beatCount = 0;
+    this.hr = null; this.spo2 = null; this.motionUntil = 0;
+    this.filtRed = 0; this.filtIr = 0;
+  };
+
+  /* Feed one raw sample. Returns { f, fr, beat } where f is the filtered IR
+   * pulse (fraction of DC, positive on systole). */
+  SignalProcessor.prototype.process = function (t, red, ir) {
+    this.n++;
+    var a = this.n < 200 ? 1 / this.n : 0.004;           // running mean first, then ~2.5 s EMA
+    this.dcR += a * (red - this.dcR);
+    this.dcI += a * (ir - this.dcI);
+
+    // DC-normalised, inverted (more blood -> less light -> positive pulse)
+    var pr = -(red - this.dcR) / this.dcR;
+    var pi = -(ir - this.dcI) / this.dcI;
+    var fr = this.lpR.process(this.hpR.process(pr));
+    var fi = this.lpI.process(this.hpI.process(pi));
+    this.filtRed = fr; this.filtIr = fi;
+
+    // running RMS (AC amplitude) and high-frequency noise estimate
+    var b = this.n < 250 ? 1 / this.n : 0.004;
+    this.rmsR2 += b * (fr * fr - this.rmsR2);
+    this.rmsI2 += b * (fi * fi - this.rmsI2);
+    var d2 = pi - 2 * this.pn1 + this.pn2;               // 2nd difference ~ sqrt(6) * sigma
+    this.noise2 += b * (d2 * d2 - this.noise2);
+    this.pn2 = this.pn1; this.pn1 = pi;
+
+    // beat detection on the previous sample (local maximum above threshold)
+    var beat = false, rmsI = Math.sqrt(this.rmsI2);
+    if (this.n > 5) {
+      var thr = this.beatCount < 4 ? 0.8 * rmsI : Math.max(0.5 * this.ampEst, 0.5 * rmsI);
+      if (this.f1 > this.f2 && this.f1 >= fi && this.f1 > thr && this.n > this.fs) {
+        beat = this._onPeak(this.lastT, this.f1);
+      }
+      // motion detector: huge excursions relative to the learned amplitude
+      var ref = Math.max(this.ampEst, 1.5 * rmsI);
+      if (this.beatCount >= 4 && Math.abs(fi) > 3.5 * ref) this.motionUntil = t + 1500;
+    }
+    this.f2 = this.f1; this.f1 = fi; this.lastT = t;
+
+    // smoothed SpO2 (every 5th sample)
+    if (this.n % 5 === 0 && this.n > this.fs * 1.5 && this.rmsI2 > 0) {
+      // subtract the in-band noise power from both channels before taking the ratio
+      var nv = this.noise2 / 6 * 0.09;
+      var R = Math.sqrt(Math.max(this.rmsR2 - nv, 1e-12) / Math.max(this.rmsI2 - nv, 1e-12));
+      var raw = U.clamp(110 - 25 * R, 70, 100);
+      this.spo2 = this.spo2 === null ? raw : this.spo2 + 0.03 * (raw - this.spo2);
+    }
+    return { f: fi, fr: fr, beat: beat };
+  };
+
+  SignalProcessor.prototype._onPeak = function (tp, amp) {
+    var refractory = 380;                                  // ms (<= ~155 BPM)
+    if (this.lastPeakT !== null) {
+      var ibi = tp - this.lastPeakT;
+      if (ibi < refractory) return false;
+      if (ibi > 2200) {                                    // missed beat(s): restart chain
+        this.lastPeakT = tp; this.ampEst = amp; return false;
+      }
+      this.ibis.push(ibi); if (this.ibis.length > 8) this.ibis.shift();
+    }
+    this.lastPeakT = tp;
+    this.beatCount++;
+    this.amps.push(amp); if (this.amps.length > 8) this.amps.shift();
+    this.ampEst = this.beatCount <= 1 ? amp : 0.75 * this.ampEst + 0.25 * amp;
+    if (this.ibis.length >= 3) {
+      var inst = 60000 / U.median(this.ibis.slice(-6));
+      this.hr = this.hr === null ? inst : this.hr + 0.4 * (inst - this.hr);
+    }
+    return true;
+  };
+
+  function cv(a) {
+    if (a.length < 3) return 1;
+    var m = U.mean(a);
+    return m > 0 ? U.std(a) / m : 1;
+  }
+
+  /* Snapshot of the current vitals and quality metrics. */
+  SignalProcessor.prototype.getMetrics = function (nowMs) {
+    var rmsI = Math.sqrt(this.rmsI2), rmsR = Math.sqrt(this.rmsR2);
+    var R = rmsI > 0 ? rmsR / rmsI : null;
+    var piPct = 100 * 3.3 * rmsI;                           // peak-to-peak / DC, in %
+    var sigma = Math.sqrt(this.noise2 / 6) * 0.3;           // in-band noise (0.5-5 Hz of 50 Hz)
+    var snrDb = rmsI > 0 ? 20 * Math.log(rmsI / (sigma + 1e-9)) / Math.LN10 : 0;
+    var ibiCv = cv(this.ibis.slice(-6)), ampCv = cv(this.amps.slice(-6));
+    var motion = nowMs < this.motionUntil;
+
+    var snrS = U.clamp((snrDb - 10) / 22, 0, 1);
+    var piS = U.clamp((piPct - 0.3) / 0.9, 0, 1);
+    var regS = 1 - U.clamp(ibiCv / 0.15, 0, 1);
+    var ampS = 1 - U.clamp(ampCv / 0.35, 0, 1);
+    var pen = motion ? 0.6 : 1;
+    var score = 100 * (0.35 * snrS + 0.2 * piS + 0.25 * regS + 0.2 * ampS) * pen;
+    var stability = 100 * (0.5 * regS + 0.5 * ampS) * pen;
+    var searching = this.beatCount < 4;
+
+    return {
+      hr: this.hr, spo2: this.spo2, R: R, piPct: piPct, snrDb: snrDb,
+      ibiCv: ibiCv, ampCv: ampCv, motion: motion, beats: this.beatCount,
+      qualityScore: searching ? 0 : score,
+      quality: searching ? null : ns.qualityLabel(score),
+      stability: searching ? 0 : stability,
+    };
+  };
+
+  /* Features used by the Hb estimator. ln(DC_ir/DC_red) is the optical
+   * feature that carries (most of) the hemoglobin information. */
+  SignalProcessor.prototype.getFeatures = function () {
+    return {
+      x: this.dcR > 0 && this.dcI > 0 ? Math.log(this.dcI / this.dcR) : 0,
+      dcRed: this.dcR, dcIr: this.dcI,
+    };
+  };
+
+  ns.ContactDetector = ContactDetector;
+  ns.SignalProcessor = SignalProcessor;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * hb.js  -  Hemoglobin estimation (SIMULATED calibration model)
+ *
+ * The model is a linear map from the optical feature x = ln(DC_ir / DC_red)
+ * to Hb in g/dL. Its coefficients are derived analytically from the toy
+ * optical model in sensor.js - they are NOT fitted to clinical data and
+ * carry no clinical meaning.
+ *
+ * A real research prototype would replace COEFFICIENTS with a regression
+ * fitted against paired lab hemoglobin measurements (multiple features:
+ * both DC ratios, AC/DC ratios, perfusion index, skin-tone proxy, finger
+ * temperature, ...), validated on a held-out cohort.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util;
+
+  var COEFFICIENTS = {
+    id: 'SIM-CAL-0.3 (synthetic)',
+    intercept: -1.4286,       // g/dL
+    slope: 28.571,            // g/dL per unit of ln(DC_ir / DC_red)
+    userOffset: 0,            // per-device calibration offset (g/dL)
+    sigmaModel: 0.55,         // model uncertainty from finger path-length variation (g/dL, 1 sigma)
+  };
+
+  function HbEstimator() { this.model = COEFFICIENTS; }
+
+  /* Hb from a single feature value (unclamped). */
+  HbEstimator.prototype.fromFeature = function (x) {
+    return this.model.intercept + this.model.slope * x + this.model.userOffset;
+  };
+
+  /* Combine per-second windows [{ x, q }] into one estimate.
+   * Windows are quality weighted; outliers vs. the median are dropped. */
+  HbEstimator.prototype.estimate = function (windows) {
+    var R = ns.Config.hbRange, n = windows.length;
+    if (!n) return null;
+    var per = windows.map(function (w) { return this.fromFeature(w.x); }, this);
+    var med = U.median(per), sw = 0, sum = 0, kept = [];
+    for (var i = 0; i < n; i++) {
+      if (Math.abs(per[i] - med) > 1.0) continue;
+      var w = Math.pow(Math.max(windows[i].q, 1) / 100, 2);
+      sw += w; sum += w * per[i]; kept.push(per[i]);
+    }
+    if (!sw) { sw = 1; sum = med; kept = [med]; }
+    var raw = sum / sw;
+    var meanQ = U.mean(windows.map(function (w) { return w.q; }));
+    var spread = U.std(kept) / Math.sqrt(Math.max(kept.length, 1));
+    var qPenalty = 1.6 * (1 - U.clamp(meanQ / 100, 0, 1));
+    var sigma = Math.sqrt(this.model.sigmaModel * this.model.sigmaModel + spread * spread + qPenalty * qPenalty);
+    var hb = U.clamp(raw, R.min, R.max);
+    return { hb: hb, raw: raw, sigma: sigma, clamped: hb !== raw, n: kept.length, meanQuality: meanQ, model: this.model.id };
+  };
+
+  ns.HbEstimator = HbEstimator;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * bluetooth.js  -  Simulated BLE peripheral (ESP32 built-in Bluetooth)
+ *
+ * Models the parts of BLE that matter for the demo:
+ *   - advertising -> connecting -> service discovery -> connected
+ *   - a custom GATT service with a measurement characteristic (20-byte
+ *     binary packet with CRC-8) and a telemetry characteristic (live stream)
+ *   - occasional packet loss with link-layer retry
+ *   - store-and-forward: results taken while disconnected are queued by the
+ *     firmware and delivered on the next connection
+ *
+ * On real hardware: replace with NimBLE-Arduino / BLEDevice and a phone app
+ * (Web Bluetooth, Flutter, React Native) that decodes the same packet.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util;
+
+  var UUID = {
+    service:     '7a1c0001-4b2e-4f6a-9d3b-5c1e8a0f2b10',
+    measurement: '7a1c0002-4b2e-4f6a-9d3b-5c1e8a0f2b10',   // notify, 20 bytes
+    telemetry:   '7a1c0003-4b2e-4f6a-9d3b-5c1e8a0f2b10',   // notify, live PPG stream
+    control:     '7a1c0004-4b2e-4f6a-9d3b-5c1e8a0f2b10',   // write
+  };
+  var QUALITY_CODE = { Poor: 0, Fair: 1, Good: 2, Excellent: 3 };
+  var QUALITY_NAME = ['Poor', 'Fair', 'Good', 'Excellent'];
+
+  function crc8(bytes, len) {                               // poly 0x07
+    var c = 0;
+    for (var i = 0; i < len; i++) {
+      c ^= bytes[i];
+      for (var b = 0; b < 8; b++) c = (c & 0x80) ? ((c << 1) ^ 0x07) & 0xFF : (c << 1) & 0xFF;
+    }
+    return c;
+  }
+  function toHex(bytes) {
+    return Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(' ');
+  }
+
+  /* Measurement packet layout (little endian, 20 bytes):
+   *  0      0xA5 sync            1     version (1)
+   *  2      flags (b0 clamped, b1 low quality, b2 charging, b3 queued)
+   *  3-4    Hb x10 (uint16)      5-6   uncertainty x10 (uint16)
+   *  7      heart rate (BPM)     8     SpO2 (%)
+   *  9      quality 0..3         10    battery (%)
+   *  11-14  scan id (uint32)     15-18 unix time (uint32)
+   *  19     CRC-8 of bytes 0..18                                          */
+  var Packet = {
+    encode: function (rec, flags) {
+      var b = new Uint8Array(20), v = new DataView(b.buffer);
+      b[0] = 0xA5; b[1] = 1; b[2] = flags & 0xFF;
+      v.setUint16(3, Math.round(rec.hb * 10), true);
+      v.setUint16(5, Math.round(rec.sigma * 10), true);
+      b[7] = Math.round(rec.hr); b[8] = Math.round(rec.spo2);
+      b[9] = QUALITY_CODE[rec.quality] || 0; b[10] = Math.round(rec.battery);
+      v.setUint32(11, rec.id, true);
+      v.setUint32(15, Math.floor(rec.ts / 1000), true);
+      b[19] = crc8(b, 19);
+      return b;
+    },
+    decode: function (b) {
+      var v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+      return {
+        crcOk: crc8(b, 19) === b[19] && b[0] === 0xA5,
+        flags: b[2],
+        hb: v.getUint16(3, true) / 10, sigma: v.getUint16(5, true) / 10,
+        hr: b[7], spo2: b[8], quality: QUALITY_NAME[b[9]] || 'Poor', battery: b[10],
+        id: v.getUint32(11, true), ts: v.getUint32(15, true) * 1000,
+      };
+    },
+    toHex: toHex,
+  };
+
+  /* ---------------------------------------------------------------------- */
+  function BleLink(deviceName) {
+    this.deviceName = deviceName;
+    this.state = 'off';                 // off | advertising | connecting | connected
+    this.handlers = {};
+    this.mtu = 23;
+    this.stats = { notifications: 0, results: 0, retries: 0 };
+    this._timers = [];
+  }
+
+  BleLink.prototype.on = function (evt, fn) {
+    (this.handlers[evt] = this.handlers[evt] || []).push(fn);
+  };
+  BleLink.prototype._emit = function (evt, data) {
+    var list = this.handlers[evt] || [];
+    for (var i = 0; i < list.length; i++) list[i](data);
+  };
+  BleLink.prototype._log = function (dir, msg, hex) {
+    this._emit('log', { t: new Date(), dir: dir, msg: msg, hex: hex || '' });
+  };
+  BleLink.prototype._setState = function (s) {
+    if (this.state === s) return;
+    this.state = s; this._emit('state', s);
+  };
+  BleLink.prototype._later = function (ms, fn) { this._timers.push(setTimeout(fn, ms)); };
+  BleLink.prototype._clearTimers = function () {
+    this._timers.forEach(clearTimeout); this._timers = [];
+  };
+
+  /* Start advertising (called by firmware at the end of boot). */
+  BleLink.prototype.start = function () {
+    this._clearTimers();
+    this._setState('advertising');
+    this._log('dev', 'Advertising as "' + this.deviceName + '"');
+  };
+
+  /* The phone app asks to connect. */
+  BleLink.prototype.requestConnect = function () {
+    if (this.state !== 'advertising') return;
+    var self = this;
+    this._setState('connecting');
+    this._log('app', 'Connect request to ' + this.deviceName);
+    this._later(U.rand(700, 1100), function () {
+      self._log('dev', 'Link established, connection interval 30 ms');
+      self._log('app', 'Discovering services...');
+    });
+    this._later(1500, function () {
+      self.mtu = 185;
+      self._log('app', 'Service ' + UUID.service.slice(0, 8) + '... found, MTU negotiated: ' + self.mtu);
+      self._log('app', 'Subscribed to measurement + telemetry notifications');
+    });
+    this._later(1900, function () {
+      self._setState('connected');
+      self._emit('connected', null);
+    });
+  };
+
+  BleLink.prototype.disconnect = function () {
+    if (this.state === 'off') return;
+    this._clearTimers();
+    var was = this.state;
+    this._setState('advertising');
+    if (was === 'connected') this._log('dev', 'Disconnected by app, advertising again');
+  };
+
+  BleLink.prototype.stop = function () {
+    this._clearTimers(); this._setState('off');
+  };
+
+  BleLink.prototype.isConnected = function () { return this.state === 'connected'; };
+
+  /* Live stream: one object per firmware tick ({ samples, status }).
+   * A real device would batch ~10 samples per notification. */
+  BleLink.prototype.sendTelemetry = function (frame) {
+    if (this.state !== 'connected') return;
+    this.stats.notifications++;
+    this._emit('telemetry', frame);
+  };
+
+  /* Send a finished scan. Returns true if delivered, false if the device must
+   * keep it queued (not connected). */
+  BleLink.prototype.sendResult = function (rec, queued) {
+    if (this.state !== 'connected') return false;
+    var flags = (rec.clamped ? 1 : 0) | (rec.qualityScore < 45 ? 2 : 0) | (rec.charging ? 4 : 0) | (queued ? 8 : 0);
+    var bytes = Packet.encode(rec, flags), hex = toHex(bytes);
+    if (Math.random() < 0.04) {                              // simulated radio loss
+      this.stats.retries++;
+      this._log('dev', 'Notification lost (CRC/timeout), retrying', hex);
+    }
+    this.stats.results++;
+    this._log('dev', 'Notify measurement #' + rec.id + (queued ? ' (queued)' : ''), hex);
+    this._emit('result', { record: rec, hex: hex, packet: Packet.decode(bytes) });
+    return true;
+  };
+
+  /* History sync right after connecting: the phone app asks for every stored
+   * scan (oldest first). `pending` of them had been queued while offline. */
+  BleLink.prototype.sendHistory = function (records, pending) {
+    if (this.state !== 'connected') return false;
+    this._log('dev', 'History sync: ' + records.length + ' scan(s), ' + pending + ' queued while offline');
+    this._emit('history', records);
+    return true;
+  };
+
+  ns.BleUUID = UUID;
+  ns.BlePacket = Packet;
+  ns.BleLink = BleLink;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * peripherals.js  -  RGB status LED, buzzer and rechargeable battery
+ *
+ * On real hardware these map to:
+ *   RgbLed  -> 3 PWM GPIOs (ledcWrite)
+ *   Buzzer  -> 1 GPIO + tone() / ledcWriteTone()
+ *   Battery -> ADC pin on a 100k/100k divider + TP4056 charger status pin
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util;
+
+  /* ---- RGB LED ---------------------------------------------------------- */
+  var COLORS = {
+    off:    { rgb: [0, 0, 0],       name: 'Off' },
+    blue:   { rgb: [31, 95, 191],   name: 'Blue' },
+    cyan:   { rgb: [34, 184, 224],  name: 'Cyan' },
+    amber:  { rgb: [240, 160, 20],  name: 'Amber' },
+    green:  { rgb: [30, 170, 110],  name: 'Green' },
+    red:    { rgb: [214, 69, 69],   name: 'Red' },
+    white:  { rgb: [235, 242, 250], name: 'White' },
+  };
+
+  function RgbLed() {
+    this.color = 'off'; this.mode = 'solid'; this.period = 1000;
+    this.flashUntil = 0; this.flashColor = 'white';
+  }
+  /* mode: 'solid' | 'blink' | 'pulse' */
+  RgbLed.prototype.set = function (color, mode, periodMs) {
+    this.color = color; this.mode = mode || 'solid'; this.period = periodMs || 1000;
+  };
+  /* Short flash (used on every detected heartbeat). */
+  RgbLed.prototype.flash = function (now, ms, color) {
+    this.flashUntil = now + (ms || 90); this.flashColor = color || 'white';
+  };
+  RgbLed.prototype.get = function (now) {
+    var name = this.color, a = 1;
+    if (now < this.flashUntil) return this._out(this.flashColor, 1);
+    var ph = (now % this.period) / this.period;
+    if (this.mode === 'blink') a = ph < 0.5 ? 1 : 0;
+    else if (this.mode === 'pulse') a = 0.25 + 0.75 * (0.5 - 0.5 * Math.cos(2 * Math.PI * ph));
+    return this._out(name, a);
+  };
+  RgbLed.prototype._out = function (name, a) {
+    var c = COLORS[name] || COLORS.off;
+    return { r: c.rgb[0], g: c.rgb[1], b: c.rgb[2], a: name === 'off' ? 0 : a, name: c.name };
+  };
+
+  /* ---- Buzzer (Web Audio, created lazily after a user gesture) ---------- */
+  function Buzzer() {
+    this.muted = false; this.ctx = null; this.activeUntil = 0; this.unlocked = false;
+  }
+  Buzzer.prototype.unlock = function () {
+    this.unlocked = true;
+    var c = this._ensure();
+    try { if (c && c.state === 'suspended') c.resume(); } catch (e) {}
+  };
+  Buzzer.prototype._ensure = function () {
+    if (this.ctx) return this.ctx;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    } catch (e) { this.ctx = null; }
+    return this.ctx;
+  };
+  Buzzer.prototype.tone = function (freq, ms, delayMs) {
+    var d = delayMs || 0, nowReal = performance.now();
+    this.activeUntil = Math.max(this.activeUntil, nowReal + d + ms);   // drives the UI animation
+    if (this.muted) return;
+    var ctx = this.ctx || (this.unlocked ? this._ensure() : null);   // never create the context before a user gesture
+    if (!ctx || ctx.state === 'suspended') { try { if (ctx) ctx.resume(); } catch (e) {} }
+    if (!ctx || ctx.state !== 'running') return;                        // autoplay blocked: stay silent
+    var t0 = ctx.currentTime + d / 1000, osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = 'square'; osc.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.05, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + ms / 1000 + 0.02);
+  };
+  /* melody: [[freq, ms], ...] with 40 ms gaps */
+  Buzzer.prototype.melody = function (notes) {
+    var t = 0;
+    for (var i = 0; i < notes.length; i++) { this.tone(notes[i][0], notes[i][1], t); t += notes[i][1] + 40; }
+  };
+  Buzzer.prototype.isActive = function () { return performance.now() < this.activeUntil; };
+
+  /* ---- Battery ----------------------------------------------------------- */
+  function Battery(pct) {
+    this.pct = pct === undefined ? U.rand(72, 96) : pct;
+    this.charging = false;
+  }
+  /* Li-ion discharge curve (piecewise linear), 3.30 V .. 4.20 V. */
+  var CURVE = [[0, 3.30], [5, 3.50], [20, 3.68], [50, 3.80], [80, 4.00], [100, 4.20]];
+  Battery.prototype.voltage = function () {
+    var p = U.clamp(this.pct, 0, 100);
+    for (var i = 1; i < CURVE.length; i++) {
+      if (p <= CURVE[i][0]) {
+        var a = CURVE[i - 1], b = CURVE[i], t = (p - a[0]) / (b[0] - a[0]);
+        return a[1] + (b[1] - a[1]) * t + (this.charging ? 0.08 : 0);
+      }
+    }
+    return 4.2;
+  };
+  Battery.prototype.set = function (p) { this.pct = U.clamp(p, 0, 100); };
+  /* dtMs is virtual time. Draw is exaggerated so the gauge visibly moves. */
+  Battery.prototype.update = function (dtMs, active) {
+    var perSec = active ? -1 / 25 : -1 / 90;
+    if (this.charging) perSec = 1 / 8;
+    this.pct = U.clamp(this.pct + perSec * dtMs / 1000, 0, 100);
+  };
+
+  ns.RgbLed = RgbLed; ns.Buzzer = Buzzer; ns.Battery = Battery;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * display.js  -  SSD1306 128x64 OLED emulation + display logic
+ *
+ *   SSD1306            1-bit framebuffer with the same primitives as
+ *                      Adafruit_GFX (text, lines, rects, progress, bitmaps)
+ *                      rendered to a <canvas> as a pixel grid.
+ *   DisplayController  turns a firmware snapshot into screens (boot, ready,
+ *                      place finger, scanning, estimating, result, errors).
+ *
+ * The screen layouts use the 6x8 character cell (21 columns x 8 rows) just
+ * like a real SSD1306 with the default Adafruit font, so every string here
+ * would fit on the real panel.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util;
+
+  /* Classic 5x7 font, ASCII 32..126. Each glyph = 5 column bytes, bit0 = top row. */
+  var FONT = [
+    0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x5F,0x00,0x00, 0x00,0x07,0x00,0x07,0x00, 0x14,0x7F,0x14,0x7F,0x14,
+    0x24,0x2A,0x7F,0x2A,0x12, 0x23,0x13,0x08,0x64,0x62, 0x36,0x49,0x56,0x20,0x50, 0x00,0x05,0x03,0x00,0x00,
+    0x00,0x1C,0x22,0x41,0x00, 0x00,0x41,0x22,0x1C,0x00, 0x2A,0x1C,0x7F,0x1C,0x2A, 0x08,0x08,0x3E,0x08,0x08,
+    0x00,0x80,0x70,0x30,0x00, 0x08,0x08,0x08,0x08,0x08, 0x00,0x00,0x60,0x60,0x00, 0x20,0x10,0x08,0x04,0x02,
+    0x3E,0x51,0x49,0x45,0x3E, 0x00,0x42,0x7F,0x40,0x00, 0x72,0x49,0x49,0x49,0x46, 0x21,0x41,0x49,0x4D,0x33,
+    0x18,0x14,0x12,0x7F,0x10, 0x27,0x45,0x45,0x45,0x39, 0x3C,0x4A,0x49,0x49,0x31, 0x41,0x21,0x11,0x09,0x07,
+    0x36,0x49,0x49,0x49,0x36, 0x46,0x49,0x49,0x29,0x1E, 0x00,0x00,0x14,0x00,0x00, 0x00,0x40,0x34,0x00,0x00,
+    0x00,0x08,0x14,0x22,0x41, 0x14,0x14,0x14,0x14,0x14, 0x00,0x41,0x22,0x14,0x08, 0x02,0x01,0x59,0x09,0x06,
+    0x3E,0x41,0x5D,0x59,0x4E, 0x7C,0x12,0x11,0x12,0x7C, 0x7F,0x49,0x49,0x49,0x36, 0x3E,0x41,0x41,0x41,0x22,
+    0x7F,0x41,0x41,0x41,0x3E, 0x7F,0x49,0x49,0x49,0x41, 0x7F,0x09,0x09,0x09,0x01, 0x3E,0x41,0x41,0x51,0x73,
+    0x7F,0x08,0x08,0x08,0x7F, 0x00,0x41,0x7F,0x41,0x00, 0x20,0x40,0x41,0x3F,0x01, 0x7F,0x08,0x14,0x22,0x41,
+    0x7F,0x40,0x40,0x40,0x40, 0x7F,0x02,0x1C,0x02,0x7F, 0x7F,0x04,0x08,0x10,0x7F, 0x3E,0x41,0x41,0x41,0x3E,
+    0x7F,0x09,0x09,0x09,0x06, 0x3E,0x41,0x51,0x21,0x5E, 0x7F,0x09,0x19,0x29,0x46, 0x26,0x49,0x49,0x49,0x32,
+    0x03,0x01,0x7F,0x01,0x03, 0x3F,0x40,0x40,0x40,0x3F, 0x1F,0x20,0x40,0x20,0x1F, 0x3F,0x40,0x38,0x40,0x3F,
+    0x63,0x14,0x08,0x14,0x63, 0x03,0x04,0x78,0x04,0x03, 0x61,0x59,0x49,0x4D,0x43, 0x00,0x7F,0x41,0x41,0x41,
+    0x02,0x04,0x08,0x10,0x20, 0x00,0x41,0x41,0x41,0x7F, 0x04,0x02,0x01,0x02,0x04, 0x40,0x40,0x40,0x40,0x40,
+    0x00,0x03,0x07,0x08,0x00, 0x20,0x54,0x54,0x78,0x40, 0x7F,0x28,0x44,0x44,0x38, 0x38,0x44,0x44,0x44,0x28,
+    0x38,0x44,0x44,0x28,0x7F, 0x38,0x54,0x54,0x54,0x18, 0x00,0x08,0x7E,0x09,0x02, 0x18,0xA4,0xA4,0x9C,0x78,
+    0x7F,0x08,0x04,0x04,0x78, 0x00,0x44,0x7D,0x40,0x00, 0x20,0x40,0x40,0x3D,0x00, 0x7F,0x10,0x28,0x44,0x00,
+    0x00,0x41,0x7F,0x40,0x00, 0x7C,0x04,0x78,0x04,0x78, 0x7C,0x08,0x04,0x04,0x78, 0x38,0x44,0x44,0x44,0x38,
+    0xFC,0x18,0x24,0x24,0x18, 0x18,0x24,0x24,0x18,0xFC, 0x7C,0x08,0x04,0x04,0x08, 0x48,0x54,0x54,0x54,0x24,
+    0x04,0x04,0x3F,0x44,0x24, 0x3C,0x40,0x40,0x20,0x7C, 0x1C,0x20,0x40,0x20,0x1C, 0x3C,0x40,0x30,0x40,0x3C,
+    0x44,0x28,0x10,0x28,0x44, 0x4C,0x90,0x90,0x90,0x7C, 0x44,0x64,0x54,0x4C,0x44, 0x00,0x08,0x36,0x41,0x00,
+    0x00,0x00,0x77,0x00,0x00, 0x00,0x41,0x36,0x08,0x00, 0x02,0x01,0x02,0x04,0x02,
+  ];
+
+  var W = 128, H = 64, SCALE = 5;
+
+  /* ======================================================================
+   * SSD1306 framebuffer
+   * ==================================================================== */
+  function SSD1306(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas ? canvas.getContext('2d') : null;
+    if (canvas) { canvas.width = W * SCALE; canvas.height = H * SCALE; }
+    this.buf = new Uint8Array(W * H);
+    this.on = '#d6ebff';       // lit pixel colour (white OLED with a cool tint)
+    this.off = '#02050a';
+  }
+  SSD1306.W = W; SSD1306.H = H;
+
+  SSD1306.prototype.clear = function () { this.buf.fill(0); };
+  SSD1306.prototype.pixel = function (x, y, c) {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    this.buf[y * W + x] = c === 0 ? 0 : 1;
+  };
+  SSD1306.prototype.hline = function (x, y, w, c) { for (var i = 0; i < w; i++) this.pixel(x + i, y, c); };
+  SSD1306.prototype.vline = function (x, y, h, c) { for (var i = 0; i < h; i++) this.pixel(x, y + i, c); };
+  SSD1306.prototype.line = function (x0, y0, x1, y1, c) {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+    for (;;) {
+      this.pixel(x0, y0, c);
+      if (x0 === x1 && y0 === y1) break;
+      var e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  };
+  SSD1306.prototype.rect = function (x, y, w, h, c) {
+    this.hline(x, y, w, c); this.hline(x, y + h - 1, w, c);
+    this.vline(x, y, h, c); this.vline(x + w - 1, y, h, c);
+  };
+  SSD1306.prototype.fillRect = function (x, y, w, h, c) {
+    for (var j = 0; j < h; j++) this.hline(x, y + j, w, c);
+  };
+  SSD1306.prototype.circle = function (cx, cy, r, c, fill) {
+    for (var y = -r; y <= r; y++) for (var x = -r; x <= r; x++) {
+      var d = x * x + y * y;
+      if (fill ? d <= r * r + r * 0.5 : (d <= r * r + r * 0.5 && d >= (r - 1) * (r - 1))) this.pixel(cx + x, cy + y, c);
+    }
+  };
+  SSD1306.prototype.textWidth = function (s, size) { return s.length * 6 * (size || 1); };
+  /* Draw text; (x, y) is the top-left of the first 6x8 cell. color 0 = inverted. */
+  SSD1306.prototype.text = function (x, y, s, size, color) {
+    size = size || 1; color = color === 0 ? 0 : 1;
+    s = String(s);
+    for (var n = 0; n < s.length; n++) {
+      var code = s.charCodeAt(n) - 32;
+      if (code < 0 || code > 94) code = '?'.charCodeAt(0) - 32;
+      for (var col = 0; col < 5; col++) {
+        var bits = FONT[code * 5 + col];
+        for (var row = 0; row < 8; row++) {
+          if (bits & (1 << row)) {
+            if (size === 1) this.pixel(x + n * 6 + col, y + row, color);
+            else this.fillRect(x + (n * 6 + col) * size, y + row * size, size, size, color);
+          }
+        }
+      }
+    }
+  };
+  SSD1306.prototype.textCenter = function (y, s, size, color) {
+    this.text(Math.round((W - this.textWidth(s, size)) / 2), y, s, size, color);
+  };
+  SSD1306.prototype.progress = function (x, y, w, h, frac) {
+    this.rect(x, y, w, h, 1);
+    var fw = Math.round((w - 4) * U.clamp(frac, 0, 1));
+    this.fillRect(x + 2, y + 2, fw, h - 4, 1);
+  };
+  /* 14x7 battery icon with fill and optional charging bolt. */
+  SSD1306.prototype.batteryIcon = function (x, y, pct, charging) {
+    this.rect(x, y, 14, 7, 1); this.fillRect(x + 14, y + 2, 2, 3, 1);
+    var fw = Math.round(10 * U.clamp(pct, 0, 100) / 100);
+    this.fillRect(x + 2, y + 2, fw, 3, 1);
+    if (charging) {
+      this.line(x + 8, y + 1, x + 5, y + 4, 0); this.line(x + 5, y + 4, x + 8, y + 4, 0); this.line(x + 8, y + 4, x + 6, y + 6, 0);
+    }
+  };
+  /* Render the framebuffer to the canvas as a lit-pixel grid. */
+  SSD1306.prototype.flush = function () {
+    var ctx = this.ctx; if (!ctx) return;
+    ctx.fillStyle = this.off; ctx.fillRect(0, 0, W * SCALE, H * SCALE);
+    ctx.fillStyle = this.on;
+    var s = SCALE - 1;
+    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+      if (this.buf[y * W + x]) ctx.fillRect(x * SCALE, y * SCALE, s, s);
+    }
+  };
+
+  /* ======================================================================
+   * DisplayController - screen layouts
+   * Snapshot fields used: state, stateTime, bootLog, bootProgress, battery,
+   * bleState, progress, live, wave, result, message, errorLines, name, firmware
+   * ==================================================================== */
+  function DisplayController(oled) { this.oled = oled; this.lastKey = ''; }
+
+  DisplayController.prototype.render = function (snap) {
+    var d = this.oled; d.clear();
+    switch (snap.state) {
+      case 'BOOT': this._boot(d, snap); break;
+      case 'READY': this._ready(d, snap); break;
+      case 'PLACE_FINGER': this._place(d, snap); break;
+      case 'SETTLING': this._settle(d, snap); break;
+      case 'ACQUIRING': this._scanning(d, snap); break;
+      case 'PROCESSING': this._processing(d, snap); break;
+      case 'COMPLETE': this._complete(d, snap); break;
+      case 'ERROR': this._error(d, snap); break;
+      default: break;                                    // OFF: blank panel
+    }
+    d.flush();
+  };
+
+  function batteryLine(d, snap, y) {
+    d.text(0, y, 'Battery: ' + Math.floor(snap.battery.pct) + '%', 1);
+    d.batteryIcon(80, y, snap.battery.pct, snap.battery.charging);
+  }
+  function bleText(s) {
+    return s === 'connected' ? 'BLE: Connected' : s === 'connecting' ? 'BLE: Pairing...' : s === 'advertising' ? 'BLE: Advertising' : 'BLE: Off';
+  }
+  function dots(t) { return ['.', '..', '...'][Math.floor(t / 350) % 3]; }
+
+  DisplayController.prototype._boot = function (d, s) {
+    var lines = s.bootLog.slice(-5);
+    d.text(0, 0, 'HB-PROTO boot', 1);
+    d.hline(0, 9, 128, 1);
+    for (var i = 0; i < lines.length; i++) d.text(0, 13 + i * 8, lines[i], 1);
+    d.progress(0, 56, 128, 8, s.bootProgress);
+  };
+
+  DisplayController.prototype._ready = function (d, s) {
+    d.text(0, 0, s.name, 1);
+    d.text(0, 8, 'Firmware ' + s.firmware, 1);
+    batteryLine(d, s, 16);
+    d.rect(14, 29, 100, 14, 1);
+    d.textCenter(32, 'Ready for Scan', 1);
+    d.text(0, 48, bleText(s.bleState), 1);
+    if (Math.floor(s.stateTime / 600) % 2 === 0) d.textCenter(56, 'Press START to scan', 1);
+    if (s.battery.pct < 15) d.text(104, 48, 'LOW', 1);
+  };
+
+  DisplayController.prototype._place = function (d, s) {
+    d.fillRect(0, 0, 128, 10, 1);
+    d.textCenter(1, s.message && s.message.length < 22 ? s.message : 'PLACE FINGER', 1, 0);
+    // sensor pad
+    d.rect(34, 40, 60, 10, 1);
+    d.circle(54, 45, 2, 1, true); d.circle(74, 45, 2, 1, true);
+    // finger bobbing toward the pad
+    var bob = Math.round(4 * Math.sin(s.stateTime / 220));
+    var fy = 14 + bob;
+    d.rect(52, fy, 24, 26, 1);
+    d.line(52, fy + 26, 56, fy + 30, 1); d.line(75, fy + 26, 71, fy + 30, 1);
+    d.hline(56, fy + 30, 16, 1);
+    d.text(0, 56, 'Cover the sensor fully', 1);
+  };
+
+  DisplayController.prototype._settle = function (d, s) {
+    d.text(0, 0, s.name, 1);
+    batteryLine(d, s, 8);
+    d.textCenter(28, 'Finger detected', 1);
+    d.textCenter(38, 'Detecting pulse' + dots(s.stateTime), 1);
+    d.progress(0, 52, 128, 8, U.clamp(s.stateTime / ns.Config.scan.settleMs, 0, 1));
+  };
+
+  /* Scanning screen: same rows as the spec example; mini waveform on the right. */
+  DisplayController.prototype._scanning = function (d, s) {
+    var L = s.live;
+    d.text(0, 0, s.name, 1);
+    batteryLine(d, s, 8);
+    d.text(0, 16, 'Scanning' + dots(s.stateTime), 1);
+    d.text(0, 24, 'Hb: --.- g/dL', 1);
+    d.text(0, 32, 'HR: ' + (L.hr ? Math.round(L.hr) : '--') + ' BPM', 1);
+    d.text(0, 40, 'SpO2: ' + (L.spo2 ? Math.round(L.spo2) : '--') + '%', 1);
+    d.text(0, 48, 'Signal: ' + (L.quality || 'Searching'), 1);
+    d.progress(0, 56, 128, 8, s.progress);
+    this._wave(d, s.wave, 84, 24, 43, 22);
+  };
+
+  DisplayController.prototype._wave = function (d, wave, x, y, w, h) {
+    if (!wave || wave.length < 4) return;
+    var n = Math.min(wave.length, 90), seg = wave.slice(-n), min = Infinity, max = -Infinity, i;
+    for (i = 0; i < n; i++) { if (seg[i] < min) min = seg[i]; if (seg[i] > max) max = seg[i]; }
+    var span = Math.max(max - min, 1e-6), px = null, py = null;
+    for (i = 0; i < n; i++) {
+      var cx = x + Math.round(i * (w - 1) / (n - 1));
+      var cy = y + h - 1 - Math.round((seg[i] - min) / span * (h - 1));
+      if (px !== null) d.line(px, py, cx, cy, 1);
+      px = cx; py = cy;
+    }
+  };
+
+  DisplayController.prototype._processing = function (d, s) {
+    d.text(0, 0, s.name, 1);
+    batteryLine(d, s, 8);
+    d.textCenter(26, 'Estimating Hb' + dots(s.stateTime), 1);
+    d.textCenter(37, 'Applying calibration', 1);
+    d.progress(0, 52, 128, 8, U.clamp(s.stateTime / ns.Config.scan.processMs, 0, 1));
+  };
+
+  /* Result screen: exactly the layout from the specification. */
+  DisplayController.prototype._complete = function (d, s) {
+    var r = s.result;
+    d.text(0, 0, s.name, 1);
+    batteryLine(d, s, 8);
+    d.text(0, 24, 'Hb: ' + r.hb.toFixed(1) + ' g/dL', 1);
+    d.text(0, 32, 'HR: ' + Math.round(r.hr) + ' BPM', 1);
+    d.text(0, 40, 'SpO2: ' + Math.round(r.spo2) + '%', 1);
+    d.text(0, 48, 'Signal: ' + r.quality, 1);
+    d.text(0, 56, 'Scan Complete', 1);
+    // check mark + BLE state
+    d.line(92, 59, 95, 62, 1); d.line(95, 62, 102, 54, 1);
+    d.text(106, 56, s.bleState === 'connected' ? 'BT' : 'Q', 1);
+  };
+
+  DisplayController.prototype._error = function (d, s) {
+    d.fillRect(0, 0, 128, 10, 1);
+    d.textCenter(1, 'SCAN STOPPED', 1, 0);
+    var lines = s.errorLines || ['Unknown error'];
+    for (var i = 0; i < lines.length && i < 4; i++) d.textCenter(18 + i * 9, lines[i], 1);
+    if (Math.floor(s.stateTime / 600) % 2 === 0) d.textCenter(56, 'Press START to retry', 1);
+  };
+
+  ns.SSD1306 = SSD1306;
+  ns.DisplayController = DisplayController;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * user.js  -  Virtual user (the human in the loop)
+ *
+ * In 'auto' mode the virtual user follows the on-device instructions:
+ * places a finger when asked and lifts it after the scan. In 'manual' mode
+ * the person using the demo does it with the "Place finger" button.
+ * Not used with real hardware (a real finger does this).
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+
+  function VirtualUser(sensor) {
+    this.sensor = sensor;
+    this.mode = 'auto';            // 'auto' | 'manual'
+    this.stateSince = 0;
+    this.lastState = '';
+  }
+
+  VirtualUser.prototype.placeFinger = function () { this.sensor.setFingerPresent(true); };
+  VirtualUser.prototype.liftFinger = function () { this.sensor.setFingerPresent(false); };
+  VirtualUser.prototype.toggleFinger = function () { this.sensor.setFingerPresent(!this.sensor.isFingerPresent()); };
+  VirtualUser.prototype.shake = function () { this.sensor.injectMotion(1500, 3.0); };
+
+  /* Call every frame with the firmware snapshot. */
+  VirtualUser.prototype.update = function (snap) {
+    if (snap.state !== this.lastState) { this.lastState = snap.state; this.stateSince = snap.now; }
+    if (this.mode !== 'auto') return;
+    var t = snap.now - this.stateSince, on = this.sensor.isFingerPresent();
+    if (snap.state === 'PLACE_FINGER' && !on && t > 1500) this.placeFinger();
+    var idle = snap.state === 'COMPLETE' || snap.state === 'ERROR' || snap.state === 'READY' || snap.state === 'BOOT' || snap.state === 'OFF';
+    if (idle && on && t > 2500) this.liftFinger();
+  };
+
+  ns.VirtualUser = VirtualUser;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * firmware.js  -  Device firmware (state machine) - the "main loop"
+ *
+ *   BOOT -> READY -> PLACE_FINGER -> SETTLING -> ACQUIRING -> PROCESSING
+ *        -> COMPLETE   (or ERROR at any point)
+ *
+ * This is the part you would port to Arduino/ESP-IDF as loop(). It only
+ * talks to hardware through the injected objects (sensor, ble, led, buzzer,
+ * battery, store), so swapping in real drivers does not change this file.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util, C = ns.Config;
+
+  var S = {
+    OFF: 'OFF', BOOT: 'BOOT', READY: 'READY', PLACE: 'PLACE_FINGER', SETTLE: 'SETTLING',
+    ACQUIRE: 'ACQUIRING', PROCESS: 'PROCESSING', COMPLETE: 'COMPLETE', ERROR: 'ERROR',
+  };
+  var ACTIVE = [S.PLACE, S.SETTLE, S.ACQUIRE, S.PROCESS];
+
+  /* Minimal UART emulation: the firmware println()s, the UI shows a serial monitor. */
+  function SerialPort() { this.handlers = []; }
+  SerialPort.prototype.on = function (fn) { this.handlers.push(fn); };
+  SerialPort.prototype.println = function (text, kind) {
+    for (var i = 0; i < this.handlers.length; i++) this.handlers[i]({ t: ns.clock.now, text: text, kind: kind || 'out' });
+  };
+  ns.SerialPort = SerialPort;
+
+  function Firmware(deps) {
+    this.sensor = deps.sensor; this.ble = deps.ble; this.led = deps.led;
+    this.buzzer = deps.buzzer; this.battery = deps.battery; this.store = deps.store;
+    this.serial = deps.serial || { println: function () {} };
+    this.processor = new ns.SignalProcessor(this.sensor.fs);
+    this.contact = new ns.ContactDetector();
+    this.estimator = new ns.HbEstimator();
+    this.history = this.store.get('history', []);
+    this.nextId = this.store.get('nextId', 1);
+    this.state = S.OFF; this.now = 0; this.stateStart = 0;
+    this.lastBtn = -1e9;
+    this.bootLog = []; this.bootSteps = []; this.bleStarted = false;
+    this.message = ''; this.errorLines = [];
+    this.metrics = this.processor.getMetrics(0);
+    this.lastMetricsAt = 0; this.lastContact = 'none';
+    this.recent = []; this.sampleCount = 0;
+    this.winLog = []; this.windowCount = 0; this.lastSec = 0; this.provisional = null;
+    this.lossCount = 0; this.lastRecord = null;
+    var self = this;
+    this.ble.on('connected', function () { self._syncHistory(); });
+  }
+  Firmware.States = S;
+
+  Firmware.prototype._p = function (text, kind) { this.serial.println(text, kind); };
+
+  /* ---- power / boot ----------------------------------------------------- */
+  Firmware.prototype.powerOn = function (now) {
+    this.now = now; this.sensor.end(); this.ble.stop();
+    this._p('rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)');
+    this._p('[BOOT] ' + C.device.name + ' ' + C.device.firmware + ' (simulation)');
+    this.bleStarted = false; this.bootLog = [];
+    var fe = this.sensor.frontEndLabel ? this.sensor.frontEndLabel() : 'MAX30102';
+    this.bootSteps = [
+      [150, 'ESP32 CPU0/1 ok'],
+      [600, 'I2C: 0x3C 0x57'],
+      [1000, 'SSD1306 init ok'],
+      [1450, fe.indexOf('AFE') >= 0 ? 'BPW34/AFE4404 ok' : 'MAX30102 id 0x15'],
+      [1900, 'BLE adv ' + C.device.bleName],
+      [2300, 'Battery ' + Math.floor(this.battery.pct) + '% ' + this.battery.voltage().toFixed(2) + 'V'],
+      [2650, 'Self-test pass'],
+    ];
+    this.lastRecord = null; this.message = ''; this.errorLines = [];
+    this._enter(S.BOOT, now);
+  };
+
+  /* ---- state transitions ------------------------------------------------ */
+  Firmware.prototype._enter = function (st, now, keepSensor) {
+    this.state = st; this.stateStart = now;
+    this._p('[STATE] ' + st);
+    var led = this.led, bz = this.buzzer;
+    switch (st) {
+      case S.BOOT: led.set('blue', 'pulse', 900); bz.tone(1200, 70); break;
+      case S.READY: led.set('blue', 'pulse', 2400); this.sensor.end(); this.message = ''; break;
+      case S.PLACE:
+        if (!keepSensor) { this.sensor.begin(); this.recent = []; }
+        this.contact.reset(); this.lastContact = 'none';
+        led.set('amber', 'blink', 700); bz.tone(1800, 60);
+        break;
+      case S.SETTLE:
+        this.processor.reset(); this.metrics = this.processor.getMetrics(now);
+        led.set('cyan', 'pulse', 700); bz.tone(1500, 50);
+        break;
+      case S.ACQUIRE:
+        this.winLog = []; this.windowCount = 0; this.lastSec = 0; this.provisional = null;
+        led.set('cyan', 'solid', 1000);
+        break;
+      case S.PROCESS: this.sensor.end(); led.set('cyan', 'blink', 400); break;
+      case S.COMPLETE: led.set('green', 'solid', 1000); bz.melody([[1500, 90], [2200, 150]]); break;
+      case S.ERROR: this.sensor.end(); led.set('red', 'blink', 600); bz.melody([[420, 220], [420, 220]]); break;
+    }
+  };
+
+  Firmware.prototype._error = function (lines, now) {
+    this.errorLines = lines; this.message = lines[0];
+    this._p('[ERR] ' + lines.join(' | '));
+    this._enter(S.ERROR, now);
+  };
+
+  Firmware.prototype._fingerLost = function (now) {
+    this.lossCount++;
+    if (this.lossCount > C.scan.maxFingerLosses) { this._error(['Finger removed', 'Scan aborted'], now); return; }
+    this.message = 'Finger removed!';
+    this._enter(S.PLACE, now, true);
+    this.buzzer.melody([[900, 80], [900, 80]]);
+  };
+
+  /* ---- user input ------------------------------------------------------- */
+  Firmware.prototype.pressButton = function () {
+    var now = this.now;
+    if (now - this.lastBtn < 250) return;
+    this.lastBtn = now;
+    this._p('[GPIO13] button pressed');
+    switch (this.state) {
+      case S.READY: case S.COMPLETE: case S.ERROR: this._startScan(now); break;
+      case S.PLACE: case S.SETTLE: case S.ACQUIRE: case S.PROCESS:
+        this.buzzer.tone(900, 60); this._enter(S.READY, now); break;      // cancel
+      default: break;
+    }
+  };
+
+  Firmware.prototype._startScan = function (now) {
+    if (this.battery.pct < 5 && !this.battery.charging) { this._error(['Battery too low', 'Connect USB charger'], now); return; }
+    this.lossCount = 0; this.message = ''; this.errorLines = [];
+    this.lastRecord = null;
+    this._enter(S.PLACE, now);
+  };
+
+  /* ---- sample pump ------------------------------------------------------ */
+  /* Pull raw samples, run contact detection, optionally the DSP chain.
+   * Returns decimated (50 Hz) frames for the BLE telemetry stream. */
+  Firmware.prototype._ingest = function (now, dsp) {
+    var raw = this.sensor.pull(now), out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var s = raw[i], f = 0;
+      this.lastContact = this.contact.update(s.ir);
+      if (dsp) {
+        var r = this.processor.process(s.t, s.red, s.ir);
+        f = r.f;
+        if (r.beat) this.led.flash(now, 80, 'white');
+      }
+      this.sampleCount++;
+      if (this.sampleCount % 2 === 0) out.push({ red: s.red, ir: s.ir, f: f });
+      if (this.sampleCount % 4 === 0) { this.recent.push(f); if (this.recent.length > 200) this.recent.shift(); }
+    }
+    return out;
+  };
+
+  /* ---- main tick (call every frame with virtual time) -------------------- */
+  Firmware.prototype.update = function (now) {
+    var dt = Math.min(now - this.now, 200); this.now = now;
+    if (this.state === S.OFF) return;
+    this.battery.update(dt, ACTIVE.indexOf(this.state) >= 0);
+    var t = now - this.stateStart, samples = [], P = C.scan;
+
+    switch (this.state) {
+      case S.BOOT:
+        while (this.bootSteps.length && t >= this.bootSteps[0][0]) {
+          this.bootLog.push(this.bootSteps.shift()[1]);
+          this._p('[BOOT] ' + this.bootLog[this.bootLog.length - 1]);
+          if (this.bootLog.length === 5 && !this.bleStarted) { this.bleStarted = true; this.ble.start(); }
+        }
+        if (t >= P.bootMs) this._enter(S.READY, now);
+        break;
+
+      case S.READY:
+        this.led.set(this.battery.pct < 15 ? 'amber' : 'blue', this.battery.pct < 15 ? 'blink' : 'pulse', this.battery.pct < 15 ? 1800 : 2400);
+        break;
+
+      case S.PLACE:
+        samples = this._ingest(now, false);
+        if (this.lastContact === 'stable') { this.message = ''; this._enter(S.SETTLE, now); }
+        else if (t > P.placeTimeoutMs) this._error(['No finger detected', 'Check sensor window'], now);
+        break;
+
+      case S.SETTLE:
+        samples = this._ingest(now, true);
+        this._refreshMetrics(now);
+        if (this.lastContact === 'lost') this._fingerLost(now);
+        else if (t >= P.settleMs && this.processor.beatCount >= 3) this._enter(S.ACQUIRE, now);
+        else if (t >= P.settleMs + P.pulseTimeoutMs) this._error(['No pulse found', 'Press finger gently'], now);
+        break;
+
+      case S.ACQUIRE:
+        samples = this._ingest(now, true);
+        this._refreshMetrics(now);
+        if (this.lastContact === 'lost') { this._fingerLost(now); break; }
+        var sec = Math.floor(t / 1000);
+        if (sec > this.lastSec) { this.lastSec = sec; this._takeWindow(now); }
+        if (t >= P.acquireMs) this._enter(S.PROCESS, now);
+        break;
+
+      case S.PROCESS:
+        if (t >= P.processMs) this._finish(now);
+        break;
+
+      case S.ERROR:
+        if (t > 15000) this._enter(S.READY, now);
+        break;
+      default: break;
+    }
+
+    this.ble.sendTelemetry({ samples: samples, status: this.status() });
+  };
+
+  Firmware.prototype._refreshMetrics = function (now) {
+    if (now - this.lastMetricsAt < 200) return;
+    this.lastMetricsAt = now;
+    this.metrics = this.processor.getMetrics(now);
+  };
+
+  /* Once per second during ACQUIRING: store one feature window. */
+  Firmware.prototype._takeWindow = function (now) {
+    var m = this.processor.getMetrics(now); this.metrics = m;
+    this.windowCount++;
+    if (m.beats < 4 || !m.hr) return;
+    var f = this.processor.getFeatures();
+    this.winLog.push({ x: f.x, q: m.qualityScore, hr: m.hr, spo2: m.spo2, stab: m.stability,
+                       pi: m.piPct, snr: m.snrDb, R: m.R, motion: m.motion });
+    this._p('[ACQ] t=' + U.pad2(this.lastSec) + 's HR=' + Math.round(m.hr) + ' SpO2=' + Math.round(m.spo2 || 0) +
+            ' Q=' + m.quality + '(' + Math.round(m.qualityScore) + ') PI=' + m.piPct.toFixed(2) + '% x=' + f.x.toFixed(3) +
+            ' Hb~' + this.estimator.fromFeature(f.x).toFixed(1));
+    var ok = this.winLog.filter(function (w) { return w.q >= 45; });
+    if (ok.length >= 5) {
+      var e = this.estimator.estimate(ok);
+      this.provisional = e ? { hb: e.hb, sigma: e.sigma } : null;
+    }
+  };
+
+  /* End of PROCESSING: apply the calibration model, save, notify. */
+  Firmware.prototype._finish = function (now) {
+    var total = Math.max(this.windowCount, 1);
+    var valid = this.winLog.filter(function (w) { return w.q >= 45 && !w.motion; });
+    var need = Math.max(4, Math.ceil(C.scan.minValidFraction * total));
+    if (valid.length < need) { this._error(['Signal quality poor', 'Keep finger still', 'Retry scan'], now); return; }
+
+    var est = this.estimator.estimate(valid);
+    var meanQ = U.mean(valid.map(function (w) { return w.q; }));
+    var quality = ns.qualityLabel(meanQ);
+    if (quality === 'Poor') { this._error(['Signal quality poor', 'Keep finger still', 'Retry scan'], now); return; }
+
+    var last = valid.slice(-10);
+    var spo2s = last.map(function (w) { return w.spo2; }).filter(function (v) { return v; });
+    var gt = this.sensor.getGroundTruth ? this.sensor.getGroundTruth() : null;
+    var rec = {
+      id: this.nextId++, ts: Date.now(),
+      hb: U.round(est.hb, 1), sigma: U.round(est.sigma, 1),
+      hr: Math.round(U.median(last.map(function (w) { return w.hr; }))),
+      spo2: Math.round(U.clamp(U.median(spo2s), 90, 100)),
+      quality: quality, qualityScore: Math.round(meanQ),
+      stability: Math.round(U.mean(valid.map(function (w) { return w.stab; }))),
+      piPct: U.round(U.mean(valid.map(function (w) { return w.pi; })), 2),
+      snr: U.round(U.mean(valid.map(function (w) { return w.snr; })), 1),
+      R: U.round(U.mean(valid.map(function (w) { return w.R; })), 3),
+      clamped: est.clamped, battery: Math.floor(this.battery.pct), charging: this.battery.charging,
+      windows: valid.length + '/' + total, durationS: C.scan.acquireMs / 1000,
+      model: est.model, firmware: C.device.firmware,
+      frontEnd: this.sensor.frontEndLabel ? this.sensor.frontEndLabel() : 'MAX30102',
+      simRef: gt ? U.round(gt.hb, 1) : null, simContact: gt ? gt.contact : null,
+      waveform: this.recent.map(function (v) { return U.round(v * 100, 3); }),
+      synced: false,
+    };
+    this._p('[RESULT] id=' + rec.id + ' Hb=' + rec.hb.toFixed(1) + '+/-' + rec.sigma.toFixed(1) + ' g/dL HR=' + rec.hr +
+            ' SpO2=' + rec.spo2 + ' Q=' + rec.quality + ' model=' + rec.model);
+    this.lastRecord = rec;
+    this.history.unshift(rec);
+    if (this.history.length > C.scan.historyLimit) this.history.length = C.scan.historyLimit;
+    rec.synced = this.ble.sendResult(rec, false);          // false -> stays queued on the device
+    this.store.set('history', this.history);
+    this.store.set('nextId', this.nextId);
+    this._enter(S.COMPLETE, now);
+  };
+
+  /* After a (re)connection: push all stored scans to the phone. */
+  Firmware.prototype._syncHistory = function () {
+    var pending = this.history.filter(function (r) { return !r.synced; }).length;
+    this.ble.sendHistory(this.history.slice().reverse(), pending);
+    for (var i = 0; i < this.history.length; i++) this.history[i].synced = true;
+    this.store.set('history', this.history);
+  };
+
+  /* Simulation stop button: cut power. */
+  Firmware.prototype.powerOff = function (now) {
+    if (this.state === S.OFF) return;
+    this._p('[PWR] power off');
+    this.sensor.end(); this.led.set('off', 'solid', 1000);
+    this.state = S.OFF; this.stateStart = now;
+    this.ble.sendTelemetry({ samples: [], status: this.status() });
+    this.ble.stop();
+  };
+
+  /* Serial console commands (typed in the serial monitor). */
+  Firmware.prototype.command = function (line) {
+    var c = String(line).trim().toLowerCase();
+    if (!c) return;
+    this._p('> ' + c, 'in');
+    if (this.state === S.OFF && c !== 'reboot') { this._p('device is off - type "reboot" or press Start simulation'); return; }
+    switch (c.split(/\s+/)[0]) {
+      case 'help': this._p('commands: help | scan | status | history | reboot'); break;
+      case 'scan':
+        if ([S.READY, S.COMPLETE, S.ERROR].indexOf(this.state) >= 0) this.pressButton();
+        else this._p('busy: state=' + this.state);
+        break;
+      case 'status':
+        this._p('state=' + this.state + ' battery=' + Math.floor(this.battery.pct) + '% (' + this.battery.voltage().toFixed(2) + ' V' +
+                (this.battery.charging ? ', charging' : '') + ') ble=' + this.ble.state + ' stored_scans=' + this.history.length);
+        break;
+      case 'history':
+        if (!this.history.length) this._p('no stored scans');
+        this.history.slice(0, 5).forEach(function (r) {
+          this._p('#' + r.id + ' Hb=' + r.hb.toFixed(1) + ' HR=' + r.hr + ' SpO2=' + r.spo2 + ' Q=' + r.quality);
+        }, this);
+        break;
+      case 'reboot': this.powerOn(this.now); break;
+      default: this._p('unknown command: ' + c + ' (try "help")');
+    }
+  };
+
+  Firmware.prototype.clearHistory = function () {
+    this.history = []; this.store.set('history', []);
+  };
+
+  /* ---- views of the internal state -------------------------------------- */
+  /* Compact status sent over BLE with every telemetry frame. */
+  Firmware.prototype.status = function () {
+    var st = this.state, t = this.now - this.stateStart, P = C.scan, m = this.metrics, prog = 0;
+    if (st === S.SETTLE) prog = U.clamp(t / P.settleMs, 0, 1);
+    else if (st === S.ACQUIRE) prog = U.clamp(t / P.acquireMs, 0, 1);
+    else if (st === S.PROCESS) prog = U.clamp(t / P.processMs, 0, 1);
+    return {
+      state: st, progress: prog, message: this.message, errorLines: this.errorLines,
+      battery: { pct: this.battery.pct, charging: this.battery.charging, volt: this.battery.voltage() },
+      contact: this.lastContact,
+      metrics: { hr: m.hr, spo2: m.spo2, quality: m.quality, qualityScore: m.qualityScore, stability: m.stability,
+                 piPct: m.piPct, snrDb: m.snrDb, R: m.R, beats: m.beats },
+      provisional: this.provisional, lossCount: this.lossCount,
+    };
+  };
+
+  /* Everything the OLED screens need. */
+  Firmware.prototype.snapshot = function () {
+    var s = this.status(), t = this.now - this.stateStart;
+    return {
+      now: this.now, state: this.state, stateTime: t,
+      name: C.device.name, firmware: C.device.firmware,
+      bootLog: this.bootLog, bootProgress: U.clamp(t / C.scan.bootMs, 0, 1),
+      battery: s.battery, bleState: this.ble.state, progress: s.progress,
+      live: { hr: s.metrics.hr, spo2: s.metrics.spo2, quality: s.metrics.quality, stability: s.metrics.stability },
+      wave: this.recent, result: this.lastRecord, message: this.message, errorLines: this.errorLines,
+    };
+  };
+
+  ns.Firmware = Firmware;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * report.js  -  Scan report export (self-contained HTML + CSV)
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util;
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+  }
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + U.pad2(d.getMonth() + 1) + '-' + U.pad2(d.getDate()) + ' ' + ns.util.clockTime(d);
+  }
+
+  /* Inline SVG of the filtered PPG saved with the scan (values in % of DC). */
+  function waveformSvg(wf) {
+    if (!wf || wf.length < 2) return '';
+    var w = 640, h = 120, min = Infinity, max = -Infinity, i;
+    for (i = 0; i < wf.length; i++) { if (wf[i] < min) min = wf[i]; if (wf[i] > max) max = wf[i]; }
+    var span = Math.max(max - min, 1e-6), pts = [];
+    for (i = 0; i < wf.length; i++) {
+      pts.push((i * w / (wf.length - 1)).toFixed(1) + ',' + (h - 8 - (wf[i] - min) / span * (h - 16)).toFixed(1));
+    }
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="120" role="img" aria-label="Filtered PPG waveform">' +
+      '<rect width="' + w + '" height="' + h + '" fill="#f5f7fa"/>' +
+      '<polyline fill="none" stroke="#1f5fbf" stroke-width="1.6" points="' + pts.join(' ') + '"/></svg>';
+  }
+
+  var Report = {
+    /* records: newest first. selected: the scan to feature (default newest). */
+    buildHtml: function (records, selected) {
+      var r = selected || records[0], C = ns.Config;
+      var css =
+        'body{font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;color:#1b2733;margin:0;padding:32px;max-width:820px}' +
+        'h1{font-size:22px;margin:0 0 2px;color:#0f3a7a}h2{font-size:15px;margin:26px 0 8px;color:#0f3a7a}' +
+        '.sub{color:#5b6b7c;margin:0 0 18px}.notice{border-left:4px solid #1f5fbf;background:#eef4fc;padding:10px 14px;margin:16px 0}' +
+        '.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #dde3ea}' +
+        '.grid div{padding:12px 14px;border-right:1px solid #dde3ea}.grid div:last-child{border-right:0}' +
+        '.grid b{display:block;font-size:24px;color:#0f3a7a}.grid span{color:#5b6b7c;font-size:12px}' +
+        'table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #dde3ea}' +
+        'th{color:#5b6b7c;font-weight:500}dl{display:grid;grid-template-columns:200px 1fr;gap:4px 12px;margin:0}dt{color:#5b6b7c}dd{margin:0}' +
+        '@media print{body{padding:0}}';
+      var h = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Hb research report</title><style>' + css + '</style></head><body>';
+      h += '<h1>' + esc(C.device.name) + ' - scan report</h1>';
+      h += '<p class="sub">Generated ' + esc(fmtDate(Date.now())) + ' &middot; firmware ' + esc(C.device.firmware) + ' &middot; simulation</p>';
+      h += '<div class="notice"><strong>Research and educational simulation.</strong> ' + esc(C.safety) + '</div>';
+      if (r) {
+        h += '<h2>Scan #' + r.id + ' &middot; ' + esc(fmtDate(r.ts)) + '</h2>';
+        h += '<div class="grid">' +
+          '<div><b>' + r.hb.toFixed(1) + '</b><span>Estimated Hb (g/dL) &plusmn;' + r.sigma.toFixed(1) + '</span></div>' +
+          '<div><b>' + r.hr + '</b><span>Heart rate (BPM)</span></div>' +
+          '<div><b>' + r.spo2 + '</b><span>SpO&#8322; (%)</span></div>' +
+          '<div><b>' + esc(r.quality) + '</b><span>Signal quality (' + r.qualityScore + '/100)</span></div></div>';
+        h += '<h2>Filtered PPG (last 8 s)</h2>' + waveformSvg(r.waveform);
+        h += '<h2>Processing details</h2><dl>' +
+          '<dt>Signal stability</dt><dd>' + r.stability + ' %</dd>' +
+          '<dt>Perfusion index</dt><dd>' + r.piPct + ' %</dd>' +
+          '<dt>SNR</dt><dd>' + r.snr + ' dB</dd>' +
+          '<dt>Red/IR ratio R</dt><dd>' + r.R + '</dd>' +
+          '<dt>Usable windows</dt><dd>' + esc(r.windows) + ' (1 s each)</dd>' +
+          '<dt>Calibration model</dt><dd>' + esc(r.model) + '</dd>' +
+          '<dt>Optical front-end</dt><dd>' + esc(r.frontEnd) + '</dd>' +
+          '<dt>Battery at scan</dt><dd>' + r.battery + ' %</dd>' +
+          (r.simRef !== null && r.simRef !== undefined
+            ? '<dt>Simulated reference Hb</dt><dd>' + r.simRef.toFixed(1) + ' g/dL (virtual subject; error ' +
+              (r.hb - r.simRef >= 0 ? '+' : '') + (r.hb - r.simRef).toFixed(1) + ')</dd>' : '') +
+          '</dl>';
+      } else {
+        h += '<p>No scans recorded yet.</p>';
+      }
+      h += '<h2>Scan history</h2><table><thead><tr><th>#</th><th>Time</th><th>Hb (g/dL)</th><th>HR</th><th>SpO&#8322;</th><th>Quality</th><th>Sim. ref</th></tr></thead><tbody>';
+      records.forEach(function (x) {
+        h += '<tr><td>' + x.id + '</td><td>' + esc(fmtDate(x.ts)) + '</td><td>' + x.hb.toFixed(1) + ' &plusmn; ' + x.sigma.toFixed(1) +
+          '</td><td>' + x.hr + '</td><td>' + x.spo2 + '</td><td>' + esc(x.quality) + '</td><td>' +
+          (x.simRef !== null && x.simRef !== undefined ? x.simRef.toFixed(1) : '-') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+      h += '<div class="notice"><strong>Safety notice.</strong> ' + esc(C.safety) + '</div></body></html>';
+      return h;
+    },
+
+    buildCsv: function (records) {
+      var rows = [['id', 'timestamp', 'hb_g_dL', 'hb_sigma', 'hr_bpm', 'spo2_pct', 'quality', 'quality_score',
+                   'stability_pct', 'perfusion_index_pct', 'snr_db', 'R_ratio', 'sim_reference_hb', 'model', 'front_end']];
+      records.slice().reverse().forEach(function (r) {
+        rows.push([r.id, new Date(r.ts).toISOString(), r.hb, r.sigma, r.hr, r.spo2, r.quality, r.qualityScore,
+                   r.stability, r.piPct, r.snr, r.R, r.simRef === null || r.simRef === undefined ? '' : r.simRef, r.model, r.frontEnd]);
+      });
+      return rows.map(function (row) {
+        return row.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+      }).join('\n');
+    },
+
+    download: function (filename, text, mime) {
+      var blob = new Blob([text], { type: mime }), url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+    },
+  };
+
+  ns.Report = Report;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * circuit.js  -  Hardware simulator canvas (Wokwi / Proteus style)
+ *
+ * Draws the board-level wiring as SVG and animates it from the live device
+ * models: I2C activity on the SDA/SCL wires, LED channel currents, buzzer
+ * drive, button press, BLE radio, battery gauge and the finger on the optical
+ * sensor. Clicking a part selects it (see workbench.js Inspector); clicking
+ * the push button or the finger interacts with the circuit.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util, S = ns.Firmware.States;
+
+  var LEFT = ['EN', 'VP', 'VN', 'D34', 'D35', 'D32', 'D33', 'D25', 'D26', 'D27', 'D14', 'D12', 'D13', 'GND', 'VIN'];
+  var RIGHT = ['D23', 'D22', 'TX0', 'RX0', 'D21', 'D19', 'D18', 'D5', 'TX2', 'RX2', 'D4', 'D2', 'D15', 'GND', '3V3'];
+  function py(i) { return 225 + i * 21; }
+
+  /* ---- small drawing helpers (return SVG strings) ----------------------- */
+  function gnd(x, y, dir) {                         // ground flag: stub + 3 bars. dir: 'l' stub points left
+    var s = dir === 'l' ? -1 : 1;
+    return '<g class="flag"><path d="M' + x + ' ' + y + ' h' + (s * 14) + '"/>' +
+      '<path d="M' + (x + s * 14) + ' ' + (y - 7) + ' v14 M' + (x + s * 18) + ' ' + (y - 4) + ' v8 M' + (x + s * 22) + ' ' + (y - 1.5) + ' v3"/></g>';
+  }
+  function vcc(x, y, dir, label) {
+    var s = dir === 'l' ? -1 : 1;
+    return '<g class="flag red"><path d="M' + x + ' ' + y + ' h' + (s * 14) + '"/><circle cx="' + (x + s * 17) + '" cy="' + y + '" r="3"/></g>' +
+      '<text class="flag-t" x="' + (x + s * 26) + '" y="' + (y + 3) + '" text-anchor="' + (s < 0 ? 'end' : 'start') + '">' + label + '</text>';
+  }
+  function wire(id, d, color, flow) {
+    return '<path class="wire" d="' + d + '" stroke="' + color + '"/>' +
+      (flow ? '<path class="flow" id="fl-' + id + '" d="' + d + '"/>' : '');
+  }
+  function dot(x, y) { return '<circle class="junction" cx="' + x + '" cy="' + y + '" r="3.2"/>'; }
+
+  function buildSvg() {
+    var i, h = '';
+    h += '<svg id="circuit" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Circuit diagram of the Hb research prototype">';
+    h += '<defs>' +
+      '<pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#cfd8e3"/></pattern>' +
+      '<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000"/><stop offset=".3" stop-color="#fff"/></linearGradient>' +
+      '<mask id="fmask"><rect x="700" y="235" width="150" height="230" fill="url(#fade)"/></mask>' +
+      '</defs>';
+    h += '<rect width="1000" height="600" fill="url(#grid)"/>';
+
+    /* ---------------- wires (under the parts) ---------------- */
+    h += '<g class="wires">';
+    h += wire('sda', 'M554 309 H578 a7 7 0 0 1 14 0 H600 V135 H630', '#1e9e6a', true);
+    h += wire('sdab', 'M600 309 V458 H650', '#1e9e6a', true);
+    h += wire('scl', 'M554 246 H585 V115 H630', '#d98e04', true);
+    h += wire('sclb', 'M585 246 V476 H650', '#d98e04', true);
+    h += wire('r', 'M330 372 H396', '#d64545', true);
+    h += wire('g', 'M330 393 H396', '#1e9e6a', true);
+    h += wire('b', 'M330 414 H396', '#2b8ce6', true);
+    h += wire('buz', 'M330 435 H396', '#7b6aa8', true);
+    h += wire('btn', 'M330 477 H396', '#5b6b7c', true);
+    h += wire('adc', 'M200 262 V288 H396', '#2b8ce6', false);
+    h += wire('vin', 'M200 262 V519 H396', '#d64545', false);
+    h += wire('batp', 'M180 262 H200', '#d64545', false);
+    h += dot(585, 246) + dot(600, 309) + dot(200, 262) + dot(200, 288);
+    // wire tags
+    h += '<text class="tag" x="560" y="240">SCL D22</text><text class="tag" x="560" y="303">SDA D21</text>';
+    h += '<text class="tag" x="340" y="368">220\u03a9</text><text class="tag" x="236" y="283">ADC divider</text>';
+    h += '</g>';
+    // small resistors on the LED lines + divider
+    [372, 393, 414].forEach(function (y) { h += '<rect class="res" x="346" y="' + (y - 3.5) + '" width="26" height="7" rx="1.5"/>'; });
+    h += '<rect class="res" x="250" y="284" width="30" height="8" rx="1.5"/>';
+
+    /* ---------------- ESP32 DevKit V1 ---------------- */
+    h += '<g class="part" data-part="esp32">';
+    h += '<rect class="outline" x="384" y="46" width="182" height="560" rx="12"/>';
+    h += '<rect class="pcb-esp" x="400" y="60" width="150" height="500" rx="10"/>';
+    h += '<path class="antenna" d="M425 100 v-26 h10 v20 h10 v-20 h10 v20 h10 v-20 h10 v20 h10 v-20 h10 v20 h10 v-20 h10 v26"/>';
+    h += '<rect class="shield" x="425" y="108" width="100" height="98" rx="3"/>';
+    h += '<text class="shield-t" x="475" y="150" text-anchor="middle">ESP32</text><text class="shield-t s" x="475" y="165" text-anchor="middle">WROOM-32</text>';
+    h += '<rect class="usb" x="455" y="556" width="40" height="24" rx="3"/><text class="chip-t dk" x="475" y="594" text-anchor="middle">USB</text>';
+    h += '<circle id="esp-pwr" class="pwr" cx="520" cy="540" r="3.5"/>';
+    for (i = 0; i < 15; i++) {
+      h += '<circle class="pin" cx="396" cy="' + py(i) + '" r="4.2"/><text class="pin-t" x="410" y="' + (py(i) + 3.2) + '">' + LEFT[i] + '</text>';
+      h += '<circle class="pin" cx="554" cy="' + py(i) + '" r="4.2"/><text class="pin-t" x="540" y="' + (py(i) + 3.2) + '" text-anchor="end">' + RIGHT[i] + '</text>';
+    }
+    // BLE radio waves (upper right of the antenna)
+    h += '<g id="ble-waves" class="ble"><path d="M560 74 a12 12 0 0 1 10 -10"/><path d="M560 84 a22 22 0 0 1 20 -20"/><path d="M560 94 a32 32 0 0 1 30 -30"/></g>';
+    h += '<text class="tag" x="588" y="56">BLE</text>';
+    h += '<text class="label" x="475" y="30" text-anchor="middle">ESP32 DevKit V1</text>';
+    h += '</g>';
+    // ground / power flags on the ESP32 header
+    h += gnd(396, py(13), 'l') + gnd(554, py(13), 'r') + vcc(554, py(14), 'r', '3V3');
+
+    /* ---------------- SSD1306 OLED ---------------- */
+    h += '<g class="part" data-part="oled">';
+    h += '<rect class="outline" x="618" y="14" width="344" height="226" rx="10"/>';
+    h += '<rect class="pcb-oled" x="630" y="30" width="320" height="200" rx="8"/>';
+    h += '<rect class="bezel" x="668" y="58" width="264" height="136" rx="4"/>';
+    ['GND', 'VCC', 'SCL', 'SDA'].forEach(function (t, k) {
+      h += '<circle class="pin" cx="630" cy="' + (75 + 20 * k) + '" r="4"/><text class="pin-t sm" x="638" y="' + (78 + 20 * k) + '">' + t + '</text>';
+    });
+    h += '<text class="chip-t" x="800" y="216" text-anchor="middle">SSD1306 OLED 128\u00d764 \u00b7 I\u00b2C 0x3C</text>';
+    h += '<text class="label" x="790" y="8" text-anchor="middle">SSD1306 display</text>';
+    h += '</g>';
+    h += gnd(630, 75, 'l') + vcc(630, 95, 'l', '3V3');
+
+    /* ---------------- optical sensor (MAX30102 or BPW34+AFE4404) ---------------- */
+    h += '<g class="part" data-part="max">';
+    h += '<rect class="outline" x="636" y="404" width="212" height="190" rx="10"/>';
+    h += '<g id="mod-max"><rect class="pcb-max" x="650" y="420" width="190" height="150" rx="8"/>' +
+         '<rect class="win" x="722" y="438" width="104" height="52" rx="6"/>' +
+         '<circle id="opt-red" class="opt red" cx="745" cy="464" r="9"/><circle class="pd" cx="774" cy="464" r="6"/><circle id="opt-ir" class="opt ir" cx="803" cy="464" r="9"/>' +
+         '<text class="chip-t" x="745" y="486" text-anchor="middle">660</text><text class="chip-t" x="774" y="486" text-anchor="middle">PD</text><text class="chip-t" x="803" y="486" text-anchor="middle">880</text>' +
+         '<rect class="chip" x="700" y="520" width="40" height="30" rx="3"/><text class="chip-t" x="720" y="539" text-anchor="middle">MAX</text>' +
+         '<text class="chip-t" x="790" y="545" text-anchor="middle">MAX30102</text></g>';
+    h += '<g id="mod-afe" style="display:none"><rect class="pcb-afe" x="650" y="420" width="190" height="150" rx="8"/>' +
+         '<rect class="bpw" x="726" y="438" width="48" height="48" rx="3"/><path class="bpw-l" d="M726 462 h48 M750 438 v48"/>' +
+         '<circle id="opt-red2" class="opt red" cx="796" cy="450" r="8"/><circle id="opt-ir2" class="opt ir" cx="796" cy="474" r="8"/>' +
+         '<text class="chip-t" x="750" y="500" text-anchor="middle">BPW34</text><text class="chip-t" x="808" y="500" text-anchor="middle">660/880</text>' +
+         '<rect class="chip" x="690" y="518" width="62" height="34" rx="3"/><text class="chip-t" x="721" y="539" text-anchor="middle">AFE4404</text>' +
+         '<text class="chip-t" x="790" y="555" text-anchor="middle">BPW34 + AFE4404</text></g>';
+    ['INT', 'SDA', 'SCL', 'GND', 'VIN'].forEach(function (t, k) {
+      h += '<circle class="pin" cx="650" cy="' + (440 + 18 * k) + '" r="4"/><text class="pin-t sm" x="658" y="' + (443 + 18 * k) + '">' + t + '</text>';
+    });
+    h += '<text class="label" x="745" y="598" text-anchor="middle" id="max-label">MAX30102 optical sensor</text>';
+    h += '</g>';
+    h += gnd(650, 494, 'l') + vcc(650, 512, 'l', '3V3');
+
+    /* ---------------- finger (above the sensor) ---------------- */
+    h += '<g id="finger-wrap" mask="url(#fmask)"><g id="finger">' +
+         '<path class="finger-body" d="M740 235 H810 V420 C810 440 796 452 775 452 C754 452 740 440 740 420 Z"/>' +
+         '<path class="finger-nail" d="M755 408 C755 396 795 396 795 408 V426 C795 436 755 436 755 426 Z"/></g></g>';
+    h += '<g id="finger-hit" class="hit-g"><rect x="735" y="246" width="80" height="210" fill="transparent"/></g>';
+    h += '<text id="finger-hint" class="hint-t" x="725" y="338" text-anchor="end">Place finger</text>';
+
+    /* ---------------- battery ---------------- */
+    h += '<g class="part" data-part="batt">';
+    h += '<rect class="outline" x="26" y="212" width="170" height="116" rx="10"/>';
+    h += '<rect class="batt" x="40" y="225" width="140" height="90" rx="8"/><rect class="batt-nub" x="176" y="250" width="6" height="26" rx="2"/>';
+    h += '<text class="batt-t" x="110" y="248" text-anchor="middle">LiPo 3.7 V</text>';
+    for (i = 0; i < 5; i++) h += '<rect class="seg" id="bseg' + i + '" x="' + (54 + i * 24) + '" y="262" width="20" height="18" rx="2"/>';
+    h += '<text id="batt-pct" class="batt-t big" x="110" y="305" text-anchor="middle">--%</text>';
+    h += '<path id="batt-bolt" class="bolt" d="M160 232 l-8 14 h6 l-4 12 l10 -16 h-6 z"/>';
+    h += '<text class="chip-t" x="188" y="259" text-anchor="end" style="fill:#fff">+</text>';
+    h += '<text class="label" x="110" y="206" text-anchor="middle">Battery + charger</text>';
+    h += '</g>';
+    h += gnd(180, 290, 'r').replace('class="flag"', 'class="flag"');
+
+    /* ---------------- RGB LED ---------------- */
+    h += '<g class="part" data-part="led">';
+    h += '<rect class="outline" x="198" y="340" width="146" height="96" rx="9"/>';
+    h += '<rect class="comp" x="210" y="352" width="120" height="72" rx="6"/>';
+    h += '<circle class="dome-base" cx="252" cy="388" r="23"/><circle id="led-dome" class="dome" cx="252" cy="388" r="18"/>';
+    h += '<text class="pin-t dk" x="318" y="375" text-anchor="end">R</text><text class="pin-t dk" x="318" y="396" text-anchor="end">G</text><text class="pin-t dk" x="318" y="417" text-anchor="end">B</text>';
+    h += '<text class="chip-t dk" x="252" y="420" text-anchor="middle">COM\u2192GND</text>';
+    h += '<text class="label" x="270" y="336" text-anchor="middle">RGB status LED</text>';
+    h += '</g>';
+
+    /* ---------------- buzzer ---------------- */
+    h += '<g class="part" data-part="bz">';
+    h += '<rect class="outline" x="198" y="428" width="146" height="46" rx="9"/>';
+    h += '<rect class="comp" x="210" y="432" width="120" height="38" rx="6"/>';
+    h += '<circle class="bz-body" cx="238" cy="451" r="13"/><circle class="bz-hole" cx="238" cy="451" r="3"/>';
+    h += '<g id="bz-waves" class="bzw"><path d="M258 443 a10 10 0 0 1 0 16"/><path d="M265 438 a17 17 0 0 1 0 26"/><path d="M272 433 a24 24 0 0 1 0 36"/></g>';
+    h += '<text class="chip-t dk" x="318" y="466" text-anchor="end">Buzzer D14</text>';
+    h += '</g>';
+
+    /* ---------------- push button ---------------- */
+    h += '<g class="part" data-part="btn">';
+    h += '<rect class="outline" x="198" y="470" width="146" height="48" rx="9"/>';
+    h += '<rect class="comp" x="210" y="476" width="120" height="36" rx="6"/>';
+    h += '<g id="btn-cap" class="cap-g"><circle class="cap-ring" cx="244" cy="494" r="14"/><circle class="cap" cx="244" cy="494" r="10"/></g>';
+    h += '<text class="chip-t dk" x="318" y="506" text-anchor="end">Start scan D13</text>';
+    h += '</g>';
+    h += gnd(330, 498, 'r');
+
+    /* BLE antenna wave / phone hint */
+    h += '</svg>';
+    return h;
+  }
+
+  /* ======================================================================
+   * CircuitView
+   * ==================================================================== */
+  function CircuitView(d) {
+    this.d = d;                                   // { fw, sensor, user, battery, led, buzzer, ble }
+    this.wrap = document.getElementById('circuit-wrap');
+    this.wrap.innerHTML = buildSvg() +
+      '<canvas id="oled" aria-label="SSD1306 OLED display, 128 by 64 pixels"></canvas>';
+    this.svg = document.getElementById('circuit');
+    var q = function (id) { return document.getElementById(id); };
+    this.el = {
+      dome: q('led-dome'), pwr: q('esp-pwr'), ble: q('ble-waves'), bz: q('bz-waves'), finger: q('finger'),
+      fingerHint: q('finger-hint'), cap: q('btn-cap'), modMax: q('mod-max'), modAfe: q('mod-afe'), maxLabel: q('max-label'),
+      pct: q('batt-pct'), bolt: q('batt-bolt'),
+      seg: [0, 1, 2, 3, 4].map(function (i) { return q('bseg' + i); }),
+      flow: {}, opt: [q('opt-red'), q('opt-ir'), q('opt-red2'), q('opt-ir2')],
+    };
+    ['sda', 'sdab', 'scl', 'sclb', 'r', 'g', 'b', 'buz', 'btn'].forEach(function (k) { this.el.flow[k] = q('fl-' + k); }, this);
+    this.pressUntil = 0; this.selected = 'max'; this.onSelect = null;
+    this._bind();
+    this.select('max');
+  }
+
+  CircuitView.prototype._bind = function () {
+    var self = this, d = this.d;
+    this.svg.addEventListener('click', function (e) {
+      var part = e.target.closest ? e.target.closest('.part') : null;
+      if (e.target.closest && e.target.closest('#finger-hit')) { d.user.toggleFinger(); self.select('max'); return; }
+      if (part) {
+        var id = part.getAttribute('data-part');
+        self.select(id);
+        if (id === 'btn') { self.press(); }
+      }
+    });
+    this.svg.addEventListener('keydown', function (e) { if (e.key === 'Enter' && self.selected === 'btn') self.press(); });
+  };
+
+  CircuitView.prototype.press = function () {
+    this.pressUntil = performance.now() + 160;
+    this.d.fw.pressButton();
+  };
+
+  CircuitView.prototype.select = function (id) {
+    this.selected = id;
+    var parts = this.svg.querySelectorAll('.part');
+    for (var i = 0; i < parts.length; i++) {
+      parts[i].classList.toggle('sel', parts[i].getAttribute('data-part') === id);
+    }
+    if (this.onSelect) this.onSelect(id);
+  };
+
+  function setFlow(el, on, slow) {
+    if (!el) return;
+    var cls = 'flow' + (on ? ' on' : '') + (slow ? ' slow' : '');
+    if (el.getAttribute('class') !== cls) el.setAttribute('class', cls);
+  }
+
+  CircuitView.prototype.update = function (snap) {
+    var d = this.d, e = this.el, now = ns.clock.now, st = snap.state, off = st === S.OFF;
+
+    // power LED + sensor option
+    e.pwr.setAttribute('class', 'pwr' + (off ? '' : ' on'));
+    var afe = d.sensor.options && d.sensor.options.frontEnd === 'afe4404';
+    e.modMax.style.display = afe ? 'none' : ''; e.modAfe.style.display = afe ? '' : 'none';
+    e.maxLabel.textContent = afe ? 'BPW34 + AFE4404 (external front-end)' : 'MAX30102 optical sensor';
+
+    // I2C wires: display bus always when powered, sensor branches while sampling
+    var sampling = d.sensor.active && !off;
+    setFlow(e.flow.sda, !off, true); setFlow(e.flow.scl, !off, true);
+    setFlow(e.flow.sdab, sampling); setFlow(e.flow.sclb, sampling);
+
+    // RGB LED + its three channel wires
+    var c = d.led.get(now), dome = e.dome;
+    if (c.a <= 0) { dome.style.fill = '#aeb9c6'; dome.style.filter = 'none'; }
+    else {
+      dome.style.fill = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
+      dome.style.opacity = (0.45 + 0.55 * c.a).toFixed(2);
+      dome.style.filter = 'drop-shadow(0 0 ' + Math.round(10 * c.a) + 'px rgba(' + c.r + ',' + c.g + ',' + c.b + ',.9))';
+    }
+    if (c.a <= 0) dome.style.opacity = 1;
+    var on = c.a > 0.2;
+    setFlow(e.flow.r, on && c.r / 255 > 0.45); setFlow(e.flow.g, on && c.g / 255 > 0.45); setFlow(e.flow.b, on && c.b / 255 > 0.45);
+
+    // buzzer
+    var bz = d.buzzer.isActive();
+    e.bz.setAttribute('class', 'bzw' + (bz ? ' on' : ''));
+    setFlow(e.flow.buz, bz);
+
+    // button
+    var pressed = performance.now() < this.pressUntil;
+    e.cap.setAttribute('class', 'cap-g' + (pressed ? ' down' : ''));
+    setFlow(e.flow.btn, pressed);
+
+    // BLE radio
+    var bs = d.ble.state;
+    e.ble.setAttribute('class', 'ble' + (bs === 'connected' ? ' on' : bs === 'off' ? '' : ' adv'));
+
+    // finger + optical emitters
+    var down = d.sensor.isFingerPresent();
+    var fc = 'finger' + (down ? ' down' : '') + (st === S.PLACE && !down ? ' hint' : '');
+    if (e.finger.getAttribute('class') !== fc) e.finger.setAttribute('class', fc);
+    e.fingerHint.setAttribute('class', 'hint-t' + (st === S.PLACE && !down ? ' on' : ''));
+    e.fingerHint.textContent = snap.message && st === S.PLACE ? snap.message : 'Place finger';
+    var lit = sampling && d.sensor.getCoupling() > 0.5;
+    this.svg.setAttribute('class', lit ? 'lit' : '');
+    if (lit) {
+      var r = d.fw.recent, n = Math.min(r.length, 60), amp = 1e-4, i;
+      for (i = r.length - n; i < r.length; i++) amp = Math.max(amp, Math.abs(r[i]));
+      var v = n ? r[r.length - 1] : 0;
+      this.svg.style.setProperty('--pulse', U.clamp(0.5 + v / (2 * amp), 0, 1).toFixed(2));
+    }
+    for (i = 0; i < e.opt.length; i++) e.opt[i].classList.toggle('emit', sampling);
+
+    // battery
+    var pct = d.battery.pct, segsOn = Math.ceil(pct / 20);
+    for (i = 0; i < 5; i++) e.seg[i].setAttribute('class', 'seg' + (i < segsOn ? (pct < 15 ? ' low' : ' on') : ''));
+    var pt = Math.floor(pct) + '%'; if (e.pct.textContent !== pt) e.pct.textContent = pt;
+    e.bolt.setAttribute('class', 'bolt' + (d.battery.charging ? ' on' : ''));
+
+    // OLED canvas keeps its own pixels; only the selection ring changes via CSS
+  };
+
+  ns.CircuitView = CircuitView;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * workbench.js  -  Simulator chrome: toolbar, tabs, serial monitor, inspector
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util, S = ns.Firmware.States;
+
+  function $(id) { return document.getElementById(id); }
+  function setText(el, t) { if (el && el.textContent !== t) el.textContent = t; }
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+  ns.toast = toast;
+
+  function fmtSim(ms) {
+    var s = Math.max(0, ms) / 1000, m = Math.floor(s / 60);
+    return U.pad2(m) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60).toFixed(1);
+  }
+
+  /* ---- Toolbar: start/stop, restart, speed, simulated time ------------------ */
+  function Toolbar(d) {
+    this.d = d; var self = this;
+    this.btn = $('btn-power');
+    this.btn.addEventListener('click', function () {
+      if (d.fw.state === S.OFF) d.fw.powerOn(ns.clock.now); else d.fw.powerOff(ns.clock.now);
+    });
+    $('btn-reboot').addEventListener('click', function () { d.fw.powerOn(ns.clock.now); });
+    $('ctl-speed').addEventListener('change', function (e) { ns.clock.scale = parseFloat(e.target.value); });
+    this.pill = $('sim-pill');
+  }
+  Toolbar.prototype.update = function (snap) {
+    var off = snap.state === S.OFF;
+    this.btn.classList.toggle('stop', !off);
+    setText(this.btn.lastElementChild, off ? 'Start simulation' : 'Stop simulation');
+    this.pill.className = 'pill ' + (off ? 'off' : 'run');
+    setText(this.pill.lastElementChild, off ? 'Stopped' : 'Running');
+    setText($('sim-time'), fmtSim(ns.clock.now));
+  };
+
+  /* ---- Tabs (serial monitor / oscilloscope / Bluetooth log) ---------------- */
+  function Tabs() {
+    var tabs = document.querySelectorAll('.tab'), panes = document.querySelectorAll('.pane');
+    Array.prototype.forEach.call(tabs, function (t) {
+      t.addEventListener('click', function () {
+        Array.prototype.forEach.call(tabs, function (x) { x.setAttribute('aria-selected', x === t ? 'true' : 'false'); });
+        Array.prototype.forEach.call(panes, function (p) { p.hidden = p.id !== 'pane-' + t.dataset.tab; });
+      });
+    });
+  }
+
+  /* ---- Serial monitor ------------------------------------------------------- */
+  function SerialMonitor(d) {
+    this.d = d; this.lines = []; this.dirty = false; this.pre = $('serial-out'); this.stick = true;
+    var self = this;
+    d.serial.on(function (l) { self.add(l.t, l.text, l.kind); });
+    d.ble.on('log', function (l) { self.add(ns.clock.now, '[BLE] ' + (l.dir === 'app' ? 'app: ' : '') + l.msg, 'ble'); });
+    this.pre.addEventListener('scroll', function () {
+      self.stick = self.pre.scrollTop + self.pre.clientHeight >= self.pre.scrollHeight - 12;
+    });
+    $('serial-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var inp = $('serial-in'); d.fw.command(inp.value); inp.value = '';
+    });
+    $('serial-clear').addEventListener('click', function () { self.lines = []; self.dirty = true; });
+  }
+  SerialMonitor.prototype.add = function (t, text, kind) {
+    var s = (t / 1000).toFixed(3);
+    this.lines.push('<span class="ts">[' + ('       ' + s).slice(-8) + ']</span> <span class="' + (kind || 'out') + '">' +
+      text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>');
+    if (this.lines.length > 400) this.lines.shift();
+    this.dirty = true;
+  };
+  SerialMonitor.prototype.flush = function () {
+    if (!this.dirty) return;
+    this.dirty = false;
+    this.pre.innerHTML = this.lines.join('\n');
+    if (this.stick) this.pre.scrollTop = this.pre.scrollHeight;
+  };
+
+  /* ---- Inspector: properties of the selected part --------------------------- */
+  function Inspector(d, circuit) {
+    this.d = d; this.circuit = circuit; this.part = 'max';
+    var self = this;
+    circuit.onSelect = function (id) { self.show(id); };
+
+    $('ctl-subject').addEventListener('change', function (e) { d.sensor.setOptions({ subject: e.target.value }); });
+    $('ctl-contact').addEventListener('change', function (e) { d.sensor.setOptions({ contact: e.target.value }); });
+    $('ctl-frontend').addEventListener('change', function (e) {
+      d.sensor.setOptions({ frontEnd: e.target.value });
+      toast('Swapped optical front-end. Takes effect on the next scan.');
+    });
+    $('ctl-finger').addEventListener('change', function (e) { d.user.mode = e.target.value; });
+    $('btn-finger').addEventListener('click', function () { d.user.toggleFinger(); });
+    $('btn-shake').addEventListener('click', function () {
+      if (d.sensor.isFingerPresent() && d.sensor.active) { d.user.shake(); toast('Motion artifact injected'); }
+      else toast('Place a finger on the sensor first');
+    });
+    $('ctl-sound').addEventListener('change', function (e) { d.buzzer.muted = !e.target.checked; });
+    $('ctl-batt').addEventListener('input', function (e) { d.battery.set(parseFloat(e.target.value)); });
+    $('ctl-charge').addEventListener('change', function (e) { d.battery.charging = e.target.checked; });
+    $('btn-press').addEventListener('click', function () { circuit.press(); });
+    $('btn-ble-prop').addEventListener('click', function () { $('btn-ble').click(); });
+  }
+
+  Inspector.prototype.show = function (id) {
+    this.part = id;
+    var names = { esp32: 'ESP32 DevKit V1', oled: 'SSD1306 OLED', max: 'Optical sensor', led: 'RGB status LED', bz: 'Buzzer', btn: 'Push button', batt: 'Battery + charger' };
+    setText($('prop-title'), names[id] || id);
+    var secs = document.querySelectorAll('.prop-sec');
+    for (var i = 0; i < secs.length; i++) secs[i].hidden = secs[i].dataset.part !== id;
+  };
+
+  function kv(id, pairs) {
+    var el = $(id), html = '';
+    pairs.forEach(function (p) { html += '<dt>' + p[0] + '</dt><dd>' + p[1] + '</dd>'; });
+    if (el.innerHTML !== html) el.innerHTML = html;
+  }
+
+  Inspector.prototype.update = function (snap) {
+    var d = this.d, st = snap.state, now = ns.clock.now;
+    switch (this.part) {
+      case 'esp32':
+        kv('kv-esp32', [['State', st], ['Firmware', ns.Config.device.firmware], ['CPU', '240 MHz dual core'], ['Supply', '3.3 V'],
+                        ['Stored scans', d.fw.history.length], ['Bluetooth', d.ble.state]]);
+        break;
+      case 'oled':
+        kv('kv-oled', [['Controller', 'SSD1306'], ['Resolution', '128 \u00d7 64 mono'], ['Bus', 'I\u00b2C @ 0x3C'], ['Screen', st === S.OFF ? 'off' : st]]);
+        break;
+      case 'max':
+        kv('kv-max', [['Part', d.sensor.frontEndLabel ? d.sensor.frontEndLabel() : 'MAX30102'], ['LEDs', 'Red 660 nm / IR 880 nm'],
+                      ['ADC', ns.Config.sensor.adcBits + '-bit @ ' + ns.Config.sensor.fs + ' sps'],
+                      ['Status', d.sensor.active ? 'sampling' : 'shutdown'], ['Finger', d.sensor.isFingerPresent() ? 'on sensor' : 'away']]);
+        setText($('btn-finger'), d.sensor.isFingerPresent() ? 'Remove finger' : 'Place finger');
+        break;
+      case 'led':
+        var c = d.led.get(now);
+        kv('kv-led', [['Colour', c.a > 0 ? c.name : 'Off'], ['R (D25)', Math.round(c.r * c.a / 2.55) + ' %'], ['G (D26)', Math.round(c.g * c.a / 2.55) + ' %'], ['B (D27)', Math.round(c.b * c.a / 2.55) + ' %']]);
+        break;
+      case 'bz':
+        kv('kv-bz', [['Drive', 'GPIO 14'], ['State', d.buzzer.muted ? 'muted (audio off)' : d.buzzer.isActive() ? 'beeping' : 'silent']]);
+        break;
+      case 'btn':
+        kv('kv-btn', [['Input', 'GPIO 13, INPUT_PULLUP'], ['Level', performance.now() < this.circuit.pressUntil ? 'LOW (pressed)' : 'HIGH']]);
+        break;
+      case 'batt':
+        kv('kv-batt', [['Charge', Math.floor(d.battery.pct) + ' %'], ['Voltage', d.battery.voltage().toFixed(2) + ' V'],
+                       ['Charger', d.battery.charging ? 'USB connected' : 'not connected'], ['ADC pin', 'D34 via 100k/100k']]);
+        var sl = $('ctl-batt'); if (document.activeElement !== sl) sl.value = Math.round(d.battery.pct);
+        setText($('out-batt'), Math.floor(d.battery.pct) + '%');
+        break;
+      default: break;
+    }
+    var bs = d.ble.state;
+    setText($('prop-ble'), bs === 'connected' ? 'Connected' : bs === 'connecting' ? 'Pairing' : bs === 'advertising' ? 'Advertising' : 'Off');
+  };
+
+  ns.Toolbar = Toolbar; ns.Tabs = Tabs; ns.SerialMonitor = SerialMonitor; ns.Inspector = Inspector;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * ui.js  -  User interface
+ *
+ *   Dashboard    the phone side: everything here arrives over the simulated
+ *                Bluetooth link (telemetry, results, history sync).
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+  var U = ns.util, C = ns.Config, S = ns.Firmware.States;
+
+  function $(id) { return document.getElementById(id); }
+  function setText(el, txt) { if (el.textContent !== txt) el.textContent = txt; }
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+
+  /* ======================================================================
+   * Dashboard
+   * ==================================================================== */
+  var STEP_OF = { BOOT: 0, READY: 0, PLACE_FINGER: 1, SETTLING: 2, ACQUIRING: 3, PROCESSING: 4, COMPLETE: 5 };
+  var STATE_CHIP = {
+    BOOT: ['Starting', 'busy'], READY: ['Ready', 'ok'], PLACE_FINGER: ['Waiting for finger', 'busy'],
+    SETTLING: ['Detecting pulse', 'busy'], ACQUIRING: ['Measuring', 'busy'], PROCESSING: ['Estimating', 'busy'],
+    COMPLETE: ['Scan complete', 'ok'], ERROR: ['Needs attention', 'bad'], OFF: ['Off', ''],
+  };
+  var Q_COLORS = ['#d64545', '#d98e04', '#1f5fbf', '#1e9e6a'];
+  var Q_LEVEL = { Poor: 1, Fair: 2, Good: 3, Excellent: 4 };
+  var CONTACT_TXT = { none: 'No finger', settling: 'Settling', stable: 'Good contact', lost: 'Lost' };
+  var BUF = 300;                                   // 6 s at 50 Hz
+
+  function Dashboard(d) {
+    this.d = d;                                    // { ble, fw, store }
+    this.red = []; this.ir = []; this.f = [];
+    this.status = null; this.lastSampleAt = 0;
+    this.records = []; this.userDisconnected = false;
+    this.lastState = ''; this.lastGoodStep = 0; this.liveMsg = '';
+    this.cv = $('wave'); this.ctx = this.cv.getContext('2d');
+    this.lanes = [
+      { key: 'red', label: 'Raw red \u00b7 660 nm', color: '#c0392b', lo: null, hi: null },
+      { key: 'ir', label: 'Raw IR \u00b7 880 nm', color: '#6b7a8c', lo: null, hi: null },
+      { key: 'f', label: 'Filtered PPG', color: '#1f5fbf', lo: null, hi: null },
+    ];
+    this.selected = null; this.reportHtml = '';
+    this.logLines = [];
+    $('safety-text').textContent = C.safety;
+    $('foot-safety').textContent = C.safety;
+    this._bindBle(); this._bindUi();
+  }
+
+  Dashboard.prototype._bindBle = function () {
+    var self = this, ble = this.d.ble;
+    ble.on('telemetry', function (fr) { self._onTelemetry(fr); });
+    ble.on('result', function (e) {
+      self._addRecord(e.record);
+      toast('Scan #' + e.record.id + ' received over Bluetooth \u00b7 CRC ' + (e.packet.crcOk ? 'ok' : 'error'));
+    });
+    ble.on('history', function (list) {
+      list.forEach(function (r) { self._addRecord(r, true); });
+      self._renderHistory();
+      if (list.length) toast('Synced ' + list.length + ' stored scan' + (list.length > 1 ? 's' : ''));
+    });
+    ble.on('log', function (l) { self._log(l); });
+    ble.on('state', function (s) {
+      self._renderBleControls();
+      if (s === 'advertising' && !self.userDisconnected) {
+        setTimeout(function () { if (ble.state === 'advertising' && !self.userDisconnected) ble.requestConnect(); }, 1200);
+      }
+    });
+  };
+
+  Dashboard.prototype._bindUi = function () {
+    var self = this, ble = this.d.ble;
+    $('btn-ble').addEventListener('click', function () {
+      if (ble.state === 'connected') { self.userDisconnected = true; ble.disconnect(); }
+      else if (ble.state === 'advertising') { self.userDisconnected = false; ble.requestConnect(); }
+    });
+    $('btn-export').addEventListener('click', function () {
+      if (!self.records.length) { toast('No scans to export yet'); return; }
+      self._openReport(null);
+    });
+    $('btn-clear').addEventListener('click', function () {
+      var b = $('btn-clear');
+      if (b.dataset.arm === '1') {
+        clearTimeout(self._armT); b.dataset.arm = '0'; b.textContent = 'Clear history';
+        self.records = []; self.d.fw.clearHistory(); self._renderHistory(); toast('History cleared');
+      } else {
+        b.dataset.arm = '1'; b.textContent = 'Confirm clear';
+        self._armT = setTimeout(function () { b.dataset.arm = '0'; b.textContent = 'Clear history'; }, 3000);
+      }
+    });
+    $('hist-body').addEventListener('click', function (e) {
+      var tr = e.target.closest('li'); if (!tr) return;
+      var id = parseInt(tr.dataset.id, 10);
+      var rec = self.records.filter(function (r) { return r.id === id; })[0];
+      if (rec) self._openReport(rec);
+    });
+    $('rep-close').addEventListener('click', function () { $('modal').hidden = true; });
+    $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) $('modal').hidden = true; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('modal').hidden = true; });
+    $('rep-html').addEventListener('click', function () {
+      var id = self.selected ? self.selected.id : (self.records[0] || {}).id;
+      ns.Report.download('hb-research-report-scan-' + id + '.html', self.reportHtml, 'text/html');
+    });
+    $('rep-csv').addEventListener('click', function () {
+      ns.Report.download('hb-research-scan-history.csv', ns.Report.buildCsv(self.records), 'text/csv');
+    });
+    $('rep-print').addEventListener('click', function () {
+      try { var w = $('rep-frame').contentWindow; w.focus(); w.print(); }
+      catch (e) { toast('Printing is unavailable here. Use Download report instead.'); }
+    });
+    window.addEventListener('resize', function () { self._fitCanvas(true); });
+  };
+
+  /* ---- data in ---------------------------------------------------------- */
+  Dashboard.prototype._onTelemetry = function (fr) {
+    var st = fr.status;
+    // a new scan begins -> clear the old trace
+    if (st.state === S.PLACE && this.lastState !== S.PLACE && this.lastState !== '' && !st.lossCount) {
+      this.red.length = 0; this.ir.length = 0; this.f.length = 0;
+    }
+    this.lastState = st.state; this.status = st;
+    var s = fr.samples;
+    if (s.length) {
+      for (var i = 0; i < s.length; i++) { this.red.push(s[i].red); this.ir.push(s[i].ir); this.f.push(s[i].f); }
+      this.lastSampleAt = performance.now();
+      if (this.red.length > BUF + 40) {
+        var cut = this.red.length - BUF;
+        this.red.splice(0, cut); this.ir.splice(0, cut); this.f.splice(0, cut);
+      }
+    }
+  };
+
+  Dashboard.prototype._addRecord = function (rec, quiet) {
+    var copy = JSON.parse(JSON.stringify(rec));          // the phone owns its own copy
+    var idx = -1;
+    for (var i = 0; i < this.records.length; i++) if (this.records[i].id === copy.id) idx = i;
+    if (idx >= 0) this.records[idx] = copy; else this.records.push(copy);
+    this.records.sort(function (a, b) { return b.id - a.id; });
+    if (this.records.length > C.scan.historyLimit) this.records.length = C.scan.historyLimit;
+    if (!quiet) this._renderHistory();
+  };
+
+  Dashboard.prototype._log = function (l) {
+    var t = ns.util.clockTime(l.t), who = l.dir === 'app' ? 'App    ' : 'Device ';
+    this.logLines.push('[' + t + '] ' + who + l.msg + (l.hex ? '\n           ' + l.hex : ''));
+    if (this.logLines.length > 80) this.logLines.shift();
+    var el = $('ble-log'); el.textContent = this.logLines.join('\n'); el.scrollTop = el.scrollHeight;
+  };
+
+  /* ---- report modal ------------------------------------------------------ */
+  Dashboard.prototype._openReport = function (rec) {
+    this.selected = rec;
+    this.reportHtml = ns.Report.buildHtml(this.records, rec || this.records[0]);
+    $('rep-frame').srcdoc = this.reportHtml;
+    $('modal').hidden = false;
+  };
+
+  /* ---- history table ----------------------------------------------------- */
+  Dashboard.prototype._renderHistory = function () {
+    var body = $('hist-body'), html = '';
+    this.records.forEach(function (r) {
+      html += '<li data-id="' + r.id + '"><span class="h-time">' + U.clockTime(new Date(r.ts)) + '</span>' +
+        '<span class="h-hb">' + r.hb.toFixed(1) + '<small> g/dL</small></span>' +
+        '<span class="h-vit">' + r.hr + ' BPM \u00b7 ' + r.spo2 + '%</span>' +
+        '<span class="qtag ' + r.quality + '">' + r.quality + '</span></li>';
+    });
+    body.innerHTML = html;
+    $('hist-empty').hidden = this.records.length > 0;
+  };
+
+  Dashboard.prototype._renderBleControls = function () {
+    var s = this.d.ble.state, b = $('btn-ble');
+    var txt = { off: 'Bluetooth off', advertising: 'Device found, not connected', connecting: 'Connecting\u2026', connected: 'Connected to HB-PROTO-01' }[s];
+    setText($('ble-text'), txt);
+    b.textContent = s === 'connected' ? 'Disconnect' : 'Connect';
+    b.disabled = s === 'off' || s === 'connecting';
+  };
+
+  /* ---- per-frame render --------------------------------------------------- */
+  Dashboard.prototype.render = function () {
+    var st = this.status, ble = this.d.ble, connected = ble.state === 'connected';
+    this._renderChips(st, connected);
+    this._renderBleControls();
+    if (!st) { this._drawWave(); return; }
+
+    var state = st.state, step = STEP_OF[state];
+    if (step !== undefined) this.lastGoodStep = step;
+    this._renderStepper(st, step);
+    this._renderReadout(st);
+
+    var m = st.metrics, scanning = [S.SETTLE, S.ACQUIRE].indexOf(state) >= 0;
+    setText($('m-stab'), scanning && m.beats >= 4 ? Math.round(m.stability) + ' %' : '--');
+    setText($('m-pi'), scanning && m.beats >= 4 ? m.piPct.toFixed(2) + ' %' : '--');
+    setText($('m-snr'), scanning && m.beats >= 4 ? m.snrDb.toFixed(1) + ' dB' : '--');
+    setText($('m-r'), scanning && m.R ? m.R.toFixed(2) : '--');
+    setText($('m-contact'), CONTACT_TXT[st.contact] || '--');
+
+    // overlay
+    var ov = $('wave-overlay'), msg = '', fresh = performance.now() - this.lastSampleAt < 900;
+    if (!connected) msg = 'Bluetooth disconnected. Live data is paused. Scans taken now are stored on the device and sync when you reconnect.';
+    else if (state === S.BOOT || state === S.READY) msg = 'Press Start scan on the device to begin.';
+    else if (!fresh && this.f.length === 0) msg = 'Waiting for signal\u2026';
+    setText(ov, msg || ov.textContent);
+    ov.classList.toggle('hide', !msg);
+
+    var label = (STATE_CHIP[state] || [state])[0];
+    if (label !== this.liveMsg) { this.liveMsg = label; setText($('live'), 'Device status: ' + label); }
+    this._drawWave();
+  };
+
+  Dashboard.prototype._renderChips = function (st, connected) {
+    var cs = $('chip-state'), cb = $('chip-ble'), cbt = $('chip-batt');
+    var info = !st ? ['Starting', 'busy'] : !connected ? ['No data link', 'warn'] : (STATE_CHIP[st.state] || ['--', '']);
+    cs.className = 'chip ' + info[1]; setText(cs.lastElementChild, info[0]);
+    var bs = this.d.ble.state;
+    var bi = { connected: ['Bluetooth connected', 'ok'], connecting: ['Connecting\u2026', 'busy'], advertising: ['Bluetooth advertising', 'warn'], off: ['Bluetooth off', ''] }[bs];
+    cb.className = 'chip ' + bi[1]; setText(cb.lastElementChild, bi[0]);
+    if (st) {
+      var pct = st.battery.pct;
+      setText($('chip-batt-text'), Math.floor(pct) + '%' + (st.battery.charging ? ' charging' : ''));
+      $('chip-batt-fill').setAttribute('width', (19 * U.clamp(pct, 0, 100) / 100).toFixed(1));
+      cbt.classList.toggle('low', pct < 15);
+    }
+  };
+
+  Dashboard.prototype._renderStepper = function (st, step) {
+    var lis = $('stepper').querySelectorAll('li'), state = st.state, cur = step === undefined ? this.lastGoodStep : step;
+    for (var i = 0; i < lis.length; i++) {
+      var cls = '';
+      if (state === S.COMPLETE) cls = i < 5 ? 'done' : 'done now';
+      else if (state === S.ERROR) cls = i < cur ? 'done' : i === cur ? 'err' : '';
+      else cls = i < cur ? 'done' : i === cur ? 'now' : '';
+      if (lis[i].className !== cls) lis[i].className = cls;
+    }
+    var frac = (state === S.SETTLE || state === S.ACQUIRE || state === S.PROCESS) ? st.progress : 0;
+    var pct = state === S.COMPLETE ? 1 : U.clamp((cur + frac) / 5, 0, 1);
+    $('stepper-fill').style.width = (84 * pct).toFixed(1) + '%';
+  };
+
+  Dashboard.prototype._renderReadout = function (st) {
+    var state = st.state, m = st.metrics, rec = this.records[0] || null;
+    var hbEl = $('hb-val'), sub = $('hb-sub'), mark = $('range-mark');
+    var hb = null, prov = false, subTxt = 'Demonstration estimate only';
+
+    if (state === S.COMPLETE && rec) { hb = rec.hb; subTxt = 'Estimate \u00b1' + rec.sigma.toFixed(1) + ' g/dL (1\u03c3) \u00b7 demonstration only'; }
+    else if (state === S.COMPLETE) { subTxt = 'Result is stored on the device and will sync on reconnect'; }
+    else if ((state === S.ACQUIRE || state === S.PROCESS) && st.provisional) { hb = st.provisional.hb; prov = true; subTxt = 'Provisional \u00b7 still refining'; }
+    else if ([S.PLACE, S.SETTLE, S.ACQUIRE, S.PROCESS].indexOf(state) >= 0) { subTxt = 'Measuring\u2026'; }
+    else if (state === S.ERROR) { subTxt = 'No result for this scan'; }
+    else if (rec) { hb = rec.hb; subTxt = 'Last scan \u00b7 ' + U.clockTime(new Date(rec.ts)) + ' \u00b7 demonstration only'; }
+
+    setText(hbEl, hb === null ? '--.-' : hb.toFixed(1));
+    hbEl.classList.toggle('prov', prov);
+    setText(sub, subTxt);
+    if (hb === null) mark.style.opacity = 0;
+    else {
+      mark.style.opacity = prov ? 0.45 : 1;
+      mark.style.left = (U.clamp((hb - C.hbRange.min) / (C.hbRange.max - C.hbRange.min), 0, 1) * 100).toFixed(1) + '%';
+    }
+
+    // vitals
+    var live = [S.SETTLE, S.ACQUIRE].indexOf(state) >= 0, hr = '--', sp = '--', q = '--', ql = 0;
+    if (live) {
+      if (m.hr && m.beats >= 3) hr = Math.round(m.hr);
+      if (m.spo2 && m.beats >= 3) sp = Math.round(U.clamp(m.spo2, 90, 100));
+      q = m.quality || 'Searching'; ql = Q_LEVEL[m.quality] || 0;
+    } else if (state === S.PROCESS) {
+      if (m.hr) hr = Math.round(m.hr); if (m.spo2) sp = Math.round(U.clamp(m.spo2, 90, 100));
+      q = m.quality || '--'; ql = Q_LEVEL[m.quality] || 0;
+    } else if (rec && (state === S.COMPLETE || state === S.READY || state === S.BOOT)) {
+      hr = rec.hr; sp = rec.spo2; q = rec.quality; ql = Q_LEVEL[rec.quality];
+    }
+    setText($('hr-val'), String(hr)); setText($('spo2-val'), String(sp)); setText($('q-val'), q);
+    var bars = $('qbar').children;
+    for (var i = 0; i < 4; i++) bars[i].style.background = i < ql ? Q_COLORS[ql - 1] : '';
+
+    // scan status
+    var t = { main: 'Ready', sub: 'Press Start scan on the device', prog: 0 };
+    switch (state) {
+      case S.BOOT: t = { main: 'Starting', sub: 'Device is booting', prog: 0 }; break;
+      case S.PLACE: t = { main: 'Waiting for finger', sub: st.message || 'Cover the sensor window with your fingertip', prog: 0 }; break;
+      case S.SETTLE: t = { main: 'Detecting pulse', sub: 'Hold still', prog: st.progress }; break;
+      case S.ACQUIRE: t = { main: 'Measuring', sub: Math.round(st.progress * 100) + '% \u00b7 ' + Math.max(0, Math.ceil((1 - st.progress) * C.scan.acquireMs / 1000)) + ' s left', prog: st.progress }; break;
+      case S.PROCESS: t = { main: 'Estimating Hb', sub: 'Applying calibration model', prog: st.progress }; break;
+      case S.COMPLETE: t = { main: 'Scan complete', sub: this.d.ble.state === 'connected' ? 'Saved to history' : 'Saved on device, waiting to sync', prog: 1 }; break;
+      case S.ERROR: t = { main: 'Retry needed', sub: (st.errorLines || []).join(' \u00b7 '), prog: 0 }; break;
+      default: break;
+    }
+    setText($('status-val'), t.main); setText($('status-sub'), t.sub);
+    $('status-bar').style.width = (t.prog * 100).toFixed(0) + '%';
+  };
+
+  /* ---- waveform canvas ----------------------------------------------------- */
+  Dashboard.prototype._fitCanvas = function (force) {
+    var cv = this.cv, dpr = window.devicePixelRatio || 1;
+    var w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
+    if (force || cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    return dpr;
+  };
+
+  Dashboard.prototype._drawWave = function () {
+    var dpr = this._fitCanvas(false), ctx = this.ctx, W = this.cv.width, H = this.cv.height;
+    if (!W || !H) return;
+    ctx.clearRect(0, 0, W, H);
+    var padL = 12 * dpr, padR = 70 * dpr, padT = 6 * dpr, padB = 18 * dpr;
+    var laneH = (H - padT - padB) / this.lanes.length;
+    var plotW = W - padL - padR, step = plotW / (BUF - 1);
+
+    ctx.font = (11 * dpr) + 'px "IBM Plex Sans", system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+    for (var li = 0; li < this.lanes.length; li++) {
+      var lane = this.lanes[li], arr = this[lane.key], top = padT + li * laneH, n = arr.length;
+      // frame + grid
+      ctx.strokeStyle = '#e3e9f0'; ctx.lineWidth = 1 * dpr;
+      ctx.strokeRect(padL, top + 2 * dpr, plotW, laneH - 4 * dpr);
+      ctx.beginPath();
+      for (var g = 1; g < 4; g++) { var gx = padL + plotW * g / 4; ctx.moveTo(gx, top + 2 * dpr); ctx.lineTo(gx, top + laneH - 2 * dpr); }
+      ctx.moveTo(padL, top + laneH / 2); ctx.lineTo(padL + plotW, top + laneH / 2);
+      ctx.strokeStyle = '#eef2f6'; ctx.stroke();
+
+      // scale from the most recent 2.5 s (older data is clipped)
+      var from = Math.max(0, n - 125), lo = Infinity, hi = -Infinity, i;
+      for (i = from; i < n; i++) { if (arr[i] < lo) lo = arr[i]; if (arr[i] > hi) hi = arr[i]; }
+      if (n === 0) { lo = 0; hi = 1; }
+      if (lane.key === 'f') { var a = Math.max(Math.abs(lo), Math.abs(hi), 0.003); lo = -a * 1.25; hi = a * 1.25; }
+      else { var span = Math.max(hi - lo, 300), mid = (hi + lo) / 2; lo = mid - span * 0.62; hi = mid + span * 0.62; }
+      lane.lo = lane.lo === null ? lo : lane.lo + (lo - lane.lo) * 0.12;
+      lane.hi = lane.hi === null ? hi : lane.hi + (hi - lane.hi) * 0.12;
+
+      // trace
+      if (n > 1) {
+        ctx.save();
+        ctx.beginPath(); ctx.rect(padL, top + 3 * dpr, plotW, laneH - 6 * dpr); ctx.clip();
+        ctx.beginPath();
+        var x0 = padL + (BUF - n) * step, rng = lane.hi - lane.lo || 1;
+        for (i = 0; i < n; i++) {
+          var x = x0 + i * step, y = top + laneH - 4 * dpr - (arr[i] - lane.lo) / rng * (laneH - 8 * dpr);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = lane.color; ctx.lineWidth = 1.7 * dpr; ctx.lineJoin = 'round'; ctx.stroke();
+        ctx.restore();
+      }
+      // label + latest value
+      ctx.fillStyle = '#5b6b7c'; ctx.textAlign = 'left';
+      ctx.fillText(lane.label, padL + 8 * dpr, top + 7 * dpr);
+      ctx.fillStyle = lane.color; ctx.textAlign = 'left';
+      var val = n ? (lane.key === 'f' ? (arr[n - 1] * 100).toFixed(2) + ' %' : String(arr[n - 1])) : '--';
+      ctx.fillText(val, padL + plotW + 8 * dpr, top + laneH / 2 - 6 * dpr);
+    }
+    ctx.fillStyle = '#8795a5'; ctx.textAlign = 'left'; ctx.fillText('-6 s', padL, H - padB + 4 * dpr);
+    ctx.textAlign = 'right'; ctx.fillText('now', padL + plotW, H - padB + 4 * dpr);
+  };
+
+  ns.Dashboard = Dashboard;
+})(window.HbSim);
+
+</script>
+<script>
+/* ==========================================================================
+ * main.js  -  Wiring and main loop
+ *
+ * TO USE REAL HARDWARE LATER: replace the sensor below with
+ *     new HbSim.sensors.WebSerialSensor()      (see sensor.js)
+ * Everything downstream (signal processing, Hb estimation, display, BLE,
+ * dashboard) consumes the same {t, red, ir} samples and is unchanged.
+ * ========================================================================== */
+(function (ns) {
+  'use strict';
+
+  function start() {
+    var sensor = new ns.sensors.SimulatedMAX30102();      // <- swap point
+    var ble = new ns.BleLink(ns.Config.device.bleName);
+    var led = new ns.RgbLed();
+    var buzzer = new ns.Buzzer();
+    var battery = new ns.Battery();
+    var store = new ns.NvStore('hbsim.');
+    var serial = new ns.SerialPort();
+
+    var fw = new ns.Firmware({ sensor: sensor, ble: ble, led: led, buzzer: buzzer, battery: battery, store: store, serial: serial });
+    var user = new ns.VirtualUser(sensor);
+    var deps = { fw: fw, sensor: sensor, user: user, battery: battery, led: led, buzzer: buzzer, ble: ble, store: store, serial: serial };
+
+    // circuit first: it creates the <canvas id="oled"> that the display driver draws into
+    var circuit = new ns.CircuitView(deps);
+    var oled = new ns.SSD1306(document.getElementById('oled'));
+    var display = new ns.DisplayController(oled);
+
+    var toolbar = new ns.Toolbar(deps);
+    new ns.Tabs();
+    var monitor = new ns.SerialMonitor(deps);
+    var inspector = new ns.Inspector(deps, circuit);
+    var dashboard = new ns.Dashboard(deps);
+
+    // Browsers only allow audio after a user gesture.
+    var unlock = function () {
+      buzzer.unlock();
+      document.removeEventListener('pointerdown', unlock, true);
+      document.removeEventListener('keydown', unlock, true);
+    };
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('keydown', unlock, true);
+
+    fw.powerOn(0);
+
+    var last = performance.now(), lastOled = 0;
+    function frame(ts) {
+      var dt = Math.min(ts - last, 100);              // pause gracefully when the tab was hidden
+      last = ts;
+      ns.clock.now += dt * ns.clock.scale;
+
+      fw.update(ns.clock.now);
+      var snap = fw.snapshot();
+      user.update(snap);
+
+      if (ts - lastOled > 50) { display.render(snap); lastOled = ts; }   // ~20 fps OLED refresh
+      circuit.update(snap);
+      inspector.update(snap);
+      toolbar.update(snap);
+      monitor.flush();
+      dashboard.render();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    // Handy for experiments in the browser console.
+    ns.debug = { fw: fw, sensor: sensor, ble: ble, battery: battery, user: user };
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})(window.HbSim);
+
+</script>
+</body>
+</html>
