@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AnemiaScan – Non-Invasive Anaemia Screening System</title>
+<style>
+:root{--bg:#eef3f6;--card:#fff;--ink:#16222b;--mut:#5d6b76;--line:#d9e2e8;--pri:#0f5c7a;--pri2:#0a4258;--ok:#1a7f4b;--okb:#e4f5ec;--warn:#9a6700;--warnb:#fff3d1;--bad:#b42318;--badb:#fde8e6;--nab:#eceff1}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--pri2);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}.brand img{height:54px;background:#fff;border-radius:8px;padding:2px 8px}header p{font-size:13px;opacity:.9}
+.pill{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;background:#9a6700;color:#fff}.pill.ok{background:var(--ok)}.pill.bad{background:var(--bad)}
+nav{display:flex;overflow-x:auto;background:var(--pri);position:sticky;top:0;z-index:5}
+nav button{background:none;border:0;color:#cfe4ec;padding:13px 16px;font:600 14px inherit;cursor:pointer;border-bottom:4px solid transparent;white-space:nowrap}
+nav button.on{color:#fff;border-color:#f2b705}
+main{max-width:1050px;margin:18px auto;padding:0 14px 30px}
+.tab{display:none}.tab.on{display:block}
+.disc{background:var(--warnb);border-left:5px solid var(--warn);padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+h2{font-size:18px;color:var(--pri2);margin-bottom:10px}h3{font-size:15px;margin:12px 0 6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}.stat b{display:block;font-size:26px;color:var(--pri2)}.stat span{font-size:13px;color:var(--mut)}
+label{display:block;font-size:13px;font-weight:600;color:#33444f}
+input,select{width:100%;margin-top:4px;padding:10px;font-size:15px;border:1.5px solid var(--line);border-radius:8px;background:#fff}
+input:focus,select:focus{outline:2px solid var(--pri);border-color:var(--pri)}
+.chk{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:8px;padding:8px 12px;margin:4px 6px 0 0;font-weight:500;cursor:pointer}.chk input{width:auto;margin:0}
+.btn{border:2px solid var(--pri);background:#fff;color:var(--pri);padding:10px 16px;font:700 14px inherit;border-radius:8px;cursor:pointer;margin:4px 6px 4px 0}
+.btn:hover{background:#e6f1f5}.btn.p{background:var(--pri);color:#fff}.btn.p:hover{background:var(--pri2)}.btn.d{border-color:var(--bad);color:var(--bad)}.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.badge{display:inline-block;padding:3px 11px;border-radius:99px;font-size:13px;font-weight:700}
+.ok{background:var(--okb);color:var(--ok)}.warn{background:var(--warnb);color:var(--warn)}.bad{background:var(--badb);color:var(--bad)}.na{background:var(--nab);color:#455a64}.sim{background:#ede7f6;color:#5e35b1}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--mut);font-weight:600}.tw{overflow-x:auto}
+.cbox{position:relative;background:#101820;border-radius:10px;overflow:hidden;touch-action:none}
+canvas{width:100%;display:block;cursor:crosshair;touch-action:none}.roi{position:absolute;border:3px solid #00ff9d;background:rgba(0,255,157,.15);display:none;pointer-events:none}
+video{display:none;width:100%;max-width:520px;border-radius:10px;margin-top:8px;background:#000}
+.msg{font-size:13px;color:var(--mut);min-height:20px;margin-top:6px}.msg.e{color:var(--bad);font-weight:600}
+.sw{display:inline-block;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);vertical-align:middle}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin-bottom:10px}.flow span{background:#e6f1f5;border-radius:8px;padding:6px 10px;font-weight:600}.flow i{font-style:normal;color:var(--mut)}
+.log{background:#101820;color:#9ef0c0;font:12px monospace;padding:10px;border-radius:8px;height:130px;overflow:auto;white-space:pre-wrap}
+.kv th{width:20%;background:#f4f7f9}.rep h2{font-size:22px}.sub{color:var(--mut);margin-bottom:8px}.big{font-size:20px;font-weight:800;padding:12px;border-radius:8px;margin:10px 0}
+#modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:20px;z-index:20}#modal .card{max-width:820px;width:100%}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:30}
+#printArea{display:none}
+@media print{body>*:not(#printArea){display:none!important}#printArea{display:block!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><img id="logo" alt="RedLens AI logo"><p>Non-Invasive Anaemia Screening System</p></div>
+  <span id="cvPill" class="pill">Loading OpenCV…</span>
+</header>
+<nav id="nav">
+  <button data-t="dash" class="on">Dashboard</button><button data-t="pat">Patient</button><button data-t="img">Image scan</button>
+  <button data-t="hb">Hb sensor</button><button data-t="res">Result</button><button data-t="his">History</button><button data-t="hw">Hardware simulation</button>
+</nav>
+<main>
+<div class="disc"><b>Screening only.</b> This application is for screening/research demonstration only. It does not replace a laboratory haemoglobin test or professional medical diagnosis.</div>
+
+<!-- DASHBOARD -->
+<section id="t-dash" class="tab on">
+  <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Dashboard</h2><button class="btn p" id="newPat">+ New Patient</button></div>
+  <div class="grid" id="stats"></div>
+  <div class="card" style="margin-top:14px"><h2>Current screening</h2><div id="cur"></div></div>
+  <div class="card"><h2>Workflow</h2><div class="flow"><span>Patient</span><i>→</i><span>Image scan</span><i>→</i><span>Hb sensor</span><i>→</i><span>Combined analysis</span><i>→</i><span>Result</span><i>→</i><span>Report / History</span></div></div>
+  <div class="card"><h2>Recent screenings</h2><div class="tw" id="recent"></div></div>
+</section>
+
+<!-- PATIENT -->
+<section id="t-pat" class="tab">
+  <div class="card"><h2>Patient registration</h2>
+    <div class="grid">
+      <label>Patient ID *<input id="pid"></label><label>Name *<input id="pname"></label>
+      <label>Age (years) *<input id="page" type="number" min="0.5" max="110" step="0.1"></label>
+      <label>Gender *<select id="pgen"><option value="">Select…</option><option>Female</option><option>Male</option></select></label>
+      <label>Village / location<input id="pvil"></label><label>Phone (optional)<input id="pph" type="tel"></label>
+      <label>Screening centre<input id="pcen"></label><label>Screened by (operator)<input id="pby"></label>
+      <label>Screening date and time<input id="pdt" readonly></label>
+      <label>Previous anaemia history<select id="phist"><option>No</option><option>Yes</option><option>Not known</option></select></label>
+    </div>
+    <label id="pregL" style="margin-top:10px;display:none"><span class="chk"><input type="checkbox" id="ppreg"> Pregnant</span></label>
+    <h3>Symptoms</h3><div id="syms"></div>
+    <div class="row" style="margin-top:12px"><button class="btn p" id="savePat">Save and continue to image scan</button></div><p class="msg" id="patMsg"></p>
+  </div>
+</section>
+
+<!-- IMAGE -->
+<section id="t-img" class="tab">
+  <div class="card"><h2>Non-invasive image analysis</h2>
+    <div class="flow"><span>Camera / file</span><i>→</i><span>Select ROI</span><i>→</i><span>OpenCV processing</span><i>→</i><span>Colour features</span><i>→</i><span>Analysis</span></div>
+    <label style="max-width:300px">Scan site<select id="kind"><option value="nail">Nail bed</option><option value="eye">Lower eyelid (conjunctiva)</option></select></label>
+    <p class="msg" id="hint"></p>
+    <div class="row"><label class="btn p" style="margin-top:6px">Upload photo<input type="file" id="file" accept="image/*" hidden></label>
+      <button class="btn" id="camOn">Open camera</button><button class="btn" id="camCap" disabled>Capture</button><button class="btn" id="imgClr">Clear</button></div>
+    <video id="vid" autoplay playsinline muted></video>
+    <div class="cbox" style="margin-top:8px"><canvas id="cnv"></canvas><div class="roi" id="roi"></div></div>
+    <div class="row"><button class="btn p" id="analyze">Analyze region</button><span id="scanChips"></span></div>
+    <p class="msg" id="imgMsg">Upload or capture a photo, then drag a box over the area to measure.</p>
+  </div>
+  <div class="card" id="scanRes" style="display:none"></div>
+  <div class="card" id="probCard"></div>
+</section>
+
+<!-- SENSOR -->
+<section id="t-hb" class="tab">
+  <div class="card"><h2>Hb sensor</h2>
+    <div class="flow"><span>Hb sensor</span><i>→</i><span>Microcontroller</span><i>→</i><span>Data</span><i>→</i><span>Web application</span></div>
+    <div id="sensBox"></div>
+    <div class="grid" style="margin-top:12px">
+      <label>Enter Hb manually (g/dL)<input id="hbIn" type="number" min="2" max="25" step="0.1" placeholder="e.g. 10.2"></label>
+      <label>Haematocrit, optional (%)<input id="hctIn" type="number" min="5" max="70" step="0.1" placeholder="e.g. 31"></label>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <label>Pulse rate from MAX30102, optional (bpm)<input id="hrIn" type="number" min="30" max="220" step="1" placeholder="e.g. 78"></label>
+      <label>SpO₂ from MAX30102, optional (%)<input id="spo2In" type="number" min="50" max="100" step="1" placeholder="e.g. 98"></label>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn" id="vitSet">Save pulse / SpO₂</button></div>
+    <div class="row" style="margin-top:8px"><button class="btn p" id="hbSet">Use manual value</button><button class="btn" id="hbDemo">Demo sensor reading (10.2)</button>
+      <button class="btn" id="serOn">Connect real sensor (USB serial)</button><button class="btn d" id="serOff">Disconnect</button><button class="btn" id="hbReset">Reset Hb check</button></div>
+    <p class="msg"><b>Two-reading check:</b> take two Hb readings. If they differ by 0.2 g/dL or less, the average is used. If they differ more, retest.</p>
+    <p class="msg">Real sensor: an ESP32 sends lines such as <code>Hb:10.2</code> over USB serial (Chrome/Edge, localhost or https). Manual values are tagged "Manual entry"; demo and simulated values are tagged DEMO / SIMULATED.</p>
+  </div>
+</section>
+
+<!-- RESULT -->
+<section id="t-res" class="tab">
+  <div class="card" id="resCard"></div>
+  <div class="row"><button class="btn" id="rescan">Re-scan</button><button class="btn" id="resNew">New Patient</button><button class="btn p" id="resSave">Save Result</button>
+    <button class="btn" id="resPrint">Print Report</button><button class="btn" id="resDl">Download Report</button></div>
+</section>
+
+<!-- HISTORY -->
+<section id="t-his" class="tab">
+  <div class="card"><h2>Screening history</h2>
+    <div class="grid"><label>Search (ID or name)<input id="hq"></label>
+      <label>Filter by result<select id="hf"><option value="">All results</option><option>Normal Screening Range</option><option>Possible Anaemia</option><option>Needs Further Testing</option><option>Insufficient</option></select></label></div>
+    <div class="row" style="margin:8px 0"><button class="btn" id="csv">Export CSV</button><button class="btn" id="json">Export JSON</button></div>
+    <div class="tw" id="hist"></div>
+  </div>
+</section>
+
+<!-- HARDWARE SIM -->
+<section id="t-hw" class="tab">
+  <div class="card"><h2>Hardware simulation <span class="badge sim">DEMO / SIMULATED DATA</span></h2>
+    <div class="flow"><span>Hb sensor</span><i>↓</i><span>ESP32 / microcontroller</span><i>↓</i><span>Serial / Bluetooth / Wi-Fi</span><i>↓</i><span>AnemiaScan</span></div>
+    <p>Simulated ESP32 status: <b id="hwSt">Disconnected</b> · Pending reading: <b id="hwPend">none</b></p>
+    <div class="row"><button class="btn p" id="hwCon">Connect sensor</button><button class="btn d" id="hwDis">Disconnect sensor</button>
+      <button class="btn" id="hwGen">Generate Hb reading</button><button class="btn" id="hwSend">Send reading</button></div>
+    <div class="log" id="hwLog"></div>
+    <p class="msg">Everything here is simulated in the browser. Values sent from this panel are stored and printed as DEMO / SIMULATED, never as real measurements.</p>
+  </div>
+</section>
+</main>
+<div id="modal"><div class="card"><div id="modalBody"></div><div class="row"><button class="btn" id="mPrint">Print</button><button class="btn p" id="mClose">Close</button></div></div></div>
+<div id="toast"></div><div id="printArea"></div>
+
+<script>
+"use strict";
+/* ================= helpers ================= */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)), norm=(v,a,b)=>clamp((v-a)/(b-a),0,1);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const median=a=>{if(!a.length)return NaN;const s=Float32Array.from(a).sort(),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+const LS="anemiascan.records.v2";
+const load=()=>{try{return JSON.parse(localStorage.getItem(LS))||[]}catch(e){return[]}};
+const store=l=>{try{localStorage.setItem(LS,JSON.stringify(l))}catch(e){toast("Could not save: browser storage unavailable.")}};
+let tt;function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(tt);tt=setTimeout(()=>t.style.display="none",2800)}
+const cat=c=>/^Normal/.test(c)?"ok":/^Possible/.test(c)?"bad":/^Needs/.test(c)?"warn":"na";
+const isSim=s=>s==="demo"||s==="sim";
+const srcLabel=s=>({manual:"Manual entry",serial:"Real sensor (serial)",demo:"DEMO / SIMULATED",sim:"DEMO / SIMULATED"}[s]||"–");
+const fdt=iso=>iso?new Date(iso).toLocaleString():"–";
+const SYMS=["Tiredness","Dizziness","Breathlessness","Pale skin","Headache","Fast heartbeat"];
+const DISC="This application is for screening/research demonstration only. It does not replace a laboratory haemoglobin test or professional medical diagnosis.";
+
+const REPCSS=`.rp{font:13px/1.45 Arial,sans-serif;color:#16222b}.rh{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:4px solid #0a4258;padding-bottom:8px;margin-bottom:8px}.rh img{height:64px}.rh .t{text-align:right}.rh h2{font-size:20px;color:#0a4258;margin:0}
+.rm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2px 16px;font-size:12px}.dm{background:#ede7f6;color:#5e35b1;font-weight:700;text-align:center;padding:5px;border-radius:4px;margin:8px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sec{background:#0a4258;color:#fff;font-weight:700;letter-spacing:.5px;padding:5px 10px;margin:12px 0 4px;font-size:12px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rp table{width:100%;border-collapse:collapse}.rp th,.rp td{border:1px solid #cfd8dc;padding:5px 8px;text-align:left;vertical-align:top}.rp th{background:#eef3f6;color:#33444f;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rb{font-size:18px;font-weight:800;text-align:center;padding:12px;border-radius:6px;margin:6px 0;border:2px solid;-webkit-print-color-adjust:exact;print-color-adjust:exact}.rb.ok{background:#e4f5ec;color:#1a7f4b}.rb.warn{background:#fff3d1;color:#9a6700}.rb.bad{background:#fde8e6;color:#b42318}.rb.na{background:#eceff1;color:#455a64}
+.rp .note{font-size:12px;color:#455a64;font-style:italic;margin:4px 0}.rp p{margin:4px 0}.rp ol{margin-left:20px}.sg{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:6px}.rf{margin-top:10px;font-size:11px;color:#607d8b;border-top:1px solid #cfd8dc;padding-top:6px;text-align:center}`;
+document.head.appendChild(Object.assign(document.createElement("style"),{textContent:REPCSS}));
+const LOGO="data:image/jpeg;base64,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1FmoXWiQRzvjMxZmfc7rlOXFpHXGMLHq6fJ/T3GXVa6E5otB2FPL9l1nLnTl29U578kyf94k+UT18fNbDqT9l2/B+xr7BbmHd99ku9znhu7vd+/OfJcZQxNwzyN1LMVIzqLSP+1Tw0T8apM7VfDRPxqlns/NDj8mbui8dn+yf2Ng+zPofp+79+9D3u5zk/J3uOMY5r2LmzcIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAgACIgOMDwXKIgAGOS4LQTnHEdVyiAYXGAuUQHAaAMAAIWgjBAIXKIDjdGMY4eCBoHIY6LlEBxgZyucIiA4DQBgAY8FzhEQAjK4xz81yiA43R4JugnOBkdVyiA4LQcZAOOXkm6B0XKIABgYHBcBoAwBgeS5RAAAFwQD0XKIDjAzyQNaBgAAeAXKIDjAQNA5BcogOA0DkBxOVyQDzREBwGgAADAHIBA1oGAAAuUQHDmhwwQCPAoQCMYXKIDjAAxjgE3R4LlEBxha3qDRLL7Xiuiv8AqC0y90IZBbq3u2SsBJGWkOAPE+s0B3mtlRZi2nlGGk+Z4LFY6DTdopbRbIO4o6WMRxMySQOeSTxJJJJJ5kr3oiw3ndmUsBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAERCgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiA//9k=";$("#logo").src=LOGO;
+/* ================= state ================= */
+const S={patient:null,scans:{nail:null,eye:null},sensor:{hb:null,ts:null,src:null,reads:[],status:"none",diff:null},conn:"Not connected",vitals:null,rec:null,hct:null,rid:null,port:null,reader:null};
+
+/* ================= tabs ================= */
+function show(t){
+  $$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  $$(".tab").forEach(s=>s.classList.toggle("on",s.id==="t-"+t));
+  if(t==="dash")renderDash(); if(t==="res")renderResult(); if(t==="his")renderHist(); if(t==="hb")renderSensor(); if(t==="img"){renderScan();drawRoi()}
+  window.scrollTo({top:0});
+}
+$("#nav").addEventListener("click",e=>{if(e.target.dataset.t)show(e.target.dataset.t)});
+
+/* ================= OpenCV status ================= */
+let cvReady=false;
+(function loadCv(){
+  const SRC=["https://docs.opencv.org/4.x/opencv.js","https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js","https://unpkg.com/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js"];
+  const p=$("#cvPill");let i=0,timer=null,done=false;
+  const ready=()=>{if(done)return;done=true;clearInterval(timer);cvReady=true;p.textContent="OpenCV ready";p.className="pill ok"};
+  const builtin=()=>{if(done)return;done=true;clearInterval(timer);p.textContent="Built-in image engine ready";p.className="pill ok"};
+  function check(){
+    const c=window.cv;if(!c)return false;
+    if(c.Mat){ready();return true}
+    if(typeof c.then==="function"&&!c.__w){c.__w=1;c.then(m=>{window.cv=m;if(m&&m.Mat)ready()}).catch(()=>{})}
+    else if(!c.onRuntimeInitialized){c.onRuntimeInitialized=()=>{if(window.cv&&window.cv.Mat)ready()}}
+    return false}
+  function next(){
+    if(done)return;
+    if(i>=SRC.length){builtin();return}
+    const s=document.createElement("script");s.src=SRC[i++];s.async=true;
+    let moved=false;const go=()=>{if(moved||done)return;moved=true;next()};
+    s.onerror=go;document.head.appendChild(s);
+    const t0=Date.now();clearInterval(timer);
+    timer=setInterval(()=>{if(check())return;if(Date.now()-t0>25000){clearInterval(timer);go()}},300)}
+  p.textContent="Loading OpenCV…";next();
+})();
+
+/* ================= patient ================= */
+$("#syms").innerHTML=SYMS.map(s=>`<label class="chk"><input type="checkbox" class="sym" value="${s}"> ${s}</label>`).join("");
+function newPatient(){
+  S.patient=null;S.scans={nail:null,eye:null};S.sensor=freshSensor();S.rec=null;S.hct=null;S.rid=null;S.vitals=null;$("#hrIn").value="";$("#spo2In").value="";$("#hctIn").value="";clearImage();
+  ["pname","page","pvil","pph"].forEach(i=>$("#"+i).value="");$("#pgen").value="";$("#phist").value="No";$("#ppreg").checked=false;
+  $$(".sym").forEach(c=>c.checked=false);$("#pregL").style.display="none";
+  $("#pid").value="ANM-"+String(load().length+1).padStart(3,"0");$("#pdt").value=new Date().toLocaleString();$("#patMsg").textContent="";
+  show("pat");
+}
+$("#pgen").addEventListener("change",()=>{$("#pregL").style.display=$("#pgen").value==="Female"?"block":"none";if($("#pgen").value!=="Female")$("#ppreg").checked=false});
+$("#newPat").onclick=newPatient;$("#resNew").onclick=newPatient;
+$("#savePat").onclick=()=>{
+  const m=$("#patMsg"),age=parseFloat($("#page").value);
+  if(!$("#pid").value.trim()||!$("#pname").value.trim()||!$("#pgen").value||!(age>=0.5&&age<=110)){m.textContent="Enter Patient ID, name, a valid age (0.5–110) and gender.";m.className="msg e";return}
+  S.patient={id:$("#pid").value.trim(),name:$("#pname").value.trim(),age,gender:$("#pgen").value,village:$("#pvil").value.trim(),phone:$("#pph").value.trim(),
+    hist:$("#phist").value,preg:$("#ppreg").checked,symptoms:$$(".sym:checked").map(c=>c.value),dt:new Date().toISOString(),centre:$("#pcen").value.trim(),by:$("#pby").value.trim()};
+  S.rid="AS-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-5);m.textContent="Patient saved.";m.className="msg";toast("Patient saved");show("img");
+};
+$("#pid").value="ANM-"+String(load().length+1).padStart(3,"0");$("#pdt").value=new Date().toLocaleString();
+
+/* ================= image scan ================= */
+const SITE={
+  eye:{hint:"Pull the lower eyelid down and photograph the pink inner surface in even daylight, no flash. Box only the pink area.",aMin:8,aMax:30,rMin:.37,rMax:.5,minRG:20,minA:8,top:.5},
+  nail:{hint:"Photograph a relaxed nail, no polish, even daylight, no flash. Box the central pink part of the nail.",aMin:6,aMax:26,rMin:.36,rMax:.47,minRG:10,minA:5,top:1}
+};
+const cnv=$("#cnv"),ctx=cnv.getContext("2d",{willReadFrequently:true});let loaded=false,roi=null,drag=null,stream=null;
+function blank(){cnv.width=640;cnv.height=360;ctx.fillStyle="#101820";ctx.fillRect(0,0,640,360);ctx.fillStyle="#8aa0ad";ctx.font="20px sans-serif";ctx.textAlign="center";ctx.fillText("Your photo will appear here",320,180)}
+blank();
+function setImg(w,h,draw){const mw=1000;if(w>mw){h=Math.round(h*mw/w);w=mw}cnv.width=w;cnv.height=h;draw(w,h);loaded=true;roi=null;drawRoi();$("#imgMsg").textContent="Photo ready. Drag a box over the area to measure, then press Analyze."; $("#imgMsg").className="msg"}
+function clearImage(){stopCam();loaded=false;roi=null;blank();drawRoi();$("#imgMsg").textContent="Upload or capture a photo, then drag a box over the area to measure.";$("#scanRes").style.display="none"}
+$("#imgClr").onclick=clearImage;
+$("#kind").onchange=()=>{clearImage();renderScan()};
+$("#file").onchange=e=>{const f=e.target.files[0];if(!f)return;stopCam();const im=new Image();
+  im.onload=()=>{setImg(im.naturalWidth,im.naturalHeight,(w,h)=>ctx.drawImage(im,0,0,w,h));URL.revokeObjectURL(im.src)};
+  im.onerror=()=>{$("#imgMsg").textContent="Could not read this image. Try JPG or PNG.";$("#imgMsg").className="msg e"};im.src=URL.createObjectURL(f);e.target.value=""};
+function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;const v=$("#vid");v.srcObject=null;v.style.display="none";$("#camCap").disabled=true}
+$("#camOn").onclick=async()=>{try{stopCam();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280}},audio:false});
+  const v=$("#vid");v.srcObject=stream;v.style.display="block";$("#camCap").disabled=false}catch(e){alert("Camera unavailable. Allow permission and use localhost or https. You can also upload a photo.")}};
+$("#camCap").onclick=()=>{const v=$("#vid");if(!stream||!v.videoWidth)return;setImg(v.videoWidth,v.videoHeight,(w,h)=>ctx.drawImage(v,0,0,w,h));stopCam()};
+const pt=e=>{const r=cnv.getBoundingClientRect();return{x:clamp((e.clientX-r.left)*cnv.width/r.width,0,cnv.width),y:clamp((e.clientY-r.top)*cnv.height/r.height,0,cnv.height)}};
+const rect=(a,b)=>({x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(b.x-a.x),h:Math.abs(b.y-a.y)});
+function drawRoi(r=roi){const b=$("#roi");if(!r){b.style.display="none";return}const c=cnv.getBoundingClientRect(),sx=c.width/cnv.width,sy=c.height/cnv.height;
+  Object.assign(b.style,{display:"block",left:r.x*sx+"px",top:r.y*sy+"px",width:r.w*sx+"px",height:r.h*sy+"px"})}
+cnv.addEventListener("pointerdown",e=>{if(!loaded)return;e.preventDefault();cnv.setPointerCapture(e.pointerId);drag=pt(e)});
+cnv.addEventListener("pointermove",e=>{if(drag){e.preventDefault();drawRoi(rect(drag,pt(e)))}});
+cnv.addEventListener("pointerup",e=>{if(!drag)return;const r=rect(drag,pt(e));drag=null;
+  if(r.w<10||r.h<10){drawRoi();$("#imgMsg").textContent="Box too small. Drag a larger area.";$("#imgMsg").className="msg e";return}
+  roi=r;drawRoi();$("#imgMsg").textContent="Area selected. Press Analyze region.";$("#imgMsg").className="msg"});
+cnv.addEventListener("pointercancel",()=>{drag=null;drawRoi()});
+window.addEventListener("resize",()=>drawRoi());
+
+/* Built-in RGB -> HSV / Lab (same 8-bit layout as OpenCV) used when OpenCV is unavailable */
+function jsConvert(im){
+  const d=im.data,n=im.width*im.height,rd=new Uint8Array(n*3),hd=new Uint8Array(n*3),ld=new Uint8Array(n*3);
+  const f=t=>t>0.008856?Math.cbrt(t):7.787*t+16/116,lin=c=>{c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
+  for(let p=0;p<n;p++){
+    const r=d[p*4],g=d[p*4+1],b=d[p*4+2];rd[p*3]=r;rd[p*3+1]=g;rd[p*3+2]=b;
+    const mx=Math.max(r,g,b),mn=Math.min(r,g,b),df=mx-mn;let h=0;
+    if(df){h=mx===r?60*(g-b)/df:mx===g?120+60*(b-r)/df:240+60*(r-g)/df;if(h<0)h+=360}
+    hd[p*3]=Math.round(h/2)%180;hd[p*3+1]=mx?Math.round(255*df/mx):0;hd[p*3+2]=mx;
+    const R=lin(r),G=lin(g),B=lin(b);
+    const X=(0.412453*R+0.357580*G+0.180423*B)/0.950456,Y=0.212671*R+0.715160*G+0.072169*B,Z=(0.019334*R+0.119193*G+0.950227*B)/1.088754;
+    const fy=f(Y),L=Y>0.008856?116*fy-16:903.3*Y;
+    ld[p*3]=clamp(Math.round(L*255/100),0,255);ld[p*3+1]=clamp(Math.round(500*(f(X)-fy)+128),0,255);ld[p*3+2]=clamp(Math.round(200*(fy-f(Z))+128),0,255);
+  }
+  return{rd,hd,ld};
+}
+/* Colour analysis of the selected box (screening estimate only) */
+function analyze(){
+  const kind=$("#kind").value,cfg=SITE[kind],m=$("#imgMsg");m.className="msg e";
+  if(!loaded){m.textContent="Upload or capture a photo first.";return}
+  if(!roi){m.textContent="Drag a box over the area first.";return}
+  const rx=clamp(Math.round(roi.x),0,cnv.width-1),ry=clamp(Math.round(roi.y),0,cnv.height-1),rw=clamp(Math.round(roi.w),1,cnv.width-rx),rh=clamp(Math.round(roi.h),1,cnv.height-ry);
+  let src,reg,rgb,hsv,lab;
+  try{
+    let rd,hd,ld;
+    if(cvReady){
+      src=cv.imread(cnv);reg=src.roi(new cv.Rect(rx,ry,rw,rh));rgb=new cv.Mat();cv.cvtColor(reg,rgb,cv.COLOR_RGBA2RGB);
+      hsv=new cv.Mat();cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);lab=new cv.Mat();cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);
+      rd=rgb.data;hd=hsv.data;ld=lab.data;
+    }else{({rd,hd,ld}=jsConvert(ctx.getImageData(rx,ry,rw,rh)))}
+    const n=rw*rh,step=Math.max(1,Math.floor(n/40000));
+    const B={R:[],G:[],B:[],H:[],S:[],V:[],A:[]};let seen=0,glare=0,dark=0,white=0;
+    for(let p=0;p<n;p+=step){seen++;const r=rd[p*3],g=rd[p*3+1],b=rd[p*3+2],gr=.299*r+.587*g+.114*b;
+      if(gr>=245){glare++;continue}if(gr<=35){dark++;continue}
+      if(hd[p*3+1]<25&&hd[p*3+2]>185){white++;continue}
+      B.R.push(r);B.G.push(g);B.B.push(b);B.H.push(hd[p*3]);B.S.push(hd[p*3+1]);B.V.push(hd[p*3+2]);B.A.push(ld[p*3+1]-128)}
+    const valid=B.R.length;
+    if(valid<50){m.textContent="Not enough usable colour in the box (glare, shadow or white). Choose a better spot or retake.";return}
+    if(cfg.top<1&&valid>20){const cut=Float32Array.from(B.A).sort()[Math.floor(valid*(1-cfg.top))],k=B.A.map(v=>v>=cut);for(const q in B)B[q]=B[q].filter((_,i)=>k[i])}
+    const R=median(B.R),G=median(B.G),Bl=median(B.B),H=median(B.H)*2,Sa=median(B.S)/2.55,V=median(B.V)/2.55,a=median(B.A),rc=R/(R+G+Bl);
+    const pallor=Math.round((1-(.6*norm(a,cfg.aMin,cfg.aMax)+.4*norm(rc,cfg.rMin,cfg.rMax)))*1000)/10;
+    const gp=glare/seen*100,dp=dark/seen*100,vp=valid/seen*100;let lv=0;const issues=[];
+    const fl=(l,t)=>{lv=Math.max(lv,l);issues.push(t)};
+    if(gp>20)fl(2,"Strong reflections");else if(gp>8)fl(1,"Some reflections");
+    if(dp>30)fl(2,"Too dark or shadowed");else if(dp>15)fl(1,"Partly in shadow");
+    if(vp<40)fl(2,"Too little usable tissue in the box");else if(vp<60)fl(1,"Box includes white or shiny area");
+    const rej=[];
+    if(R-G<cfg.minRG)rej.push("Colour not red enough: the box may be on the wrong area or white balance is off");
+    if(a<cfg.minA)rej.push("Redness (a*) too low");
+    if(gp>15)rej.push("Too much glare");
+    if(R<90||R>230)rej.push("Bad exposure");
+    if(rej.length){lv=2;issues.unshift(...rej)}
+    S.scans[kind]={kind,rgb:[R,G,Bl].map(Math.round),hsv:[Math.round(H),Math.round(Sa),Math.round(V)],a:+a.toFixed(1),pallor,level:lv,rejected:rej.length>0,issues,
+      glare:Math.round(gp),shadow:Math.round(dp),usable:Math.round(vp),photo:cnv.toDataURL("image/jpeg",.6)};
+    m.className="msg";m.textContent=rej.length?"Region rejected: it does not look like the right tissue. Retake.":"Analysis complete.";renderScan();
+  }catch(err){console.error(err);m.textContent="OpenCV error: "+(err.message||err)}
+  finally{[src,reg,rgb,hsv,lab].forEach(x=>{try{x&&x.delete()}catch(e){}})}
+}
+$("#analyze").onclick=analyze;
+const Q=["Good","Moderate","Poor"];
+const imgState=s=>s.pallor<40?"normal":s.pallor<60?"borderline":"pale";
+const imgLabel=s=>s.rejected||s.level===2?"Insufficient Image Quality":({normal:"Normal Screening Range",borderline:"Needs Further Testing",pale:"Possible Anaemia"})[imgState(s)];
+function renderScan(){
+  renderProb();
+  const kind=$("#kind").value,s=S.scans[kind],box=$("#scanRes");$("#hint").textContent=(kind==="nail"?"Check 1 of 2 · Nail bed. ":"Check 2 of 2 · Lower eyelid. ")+SITE[kind].hint;
+  $("#scanChips").innerHTML=["nail","eye"].map(k=>`<span class="badge ${S.scans[k]?cat(imgLabel(S.scans[k])):"na"}">${k==="nail"?"Nail":"Eye"}: ${S.scans[k]?imgLabel(S.scans[k]):"not scanned"}</span> `).join("");
+  if(!s){box.style.display="none";return}
+  box.style.display="block";
+  box.innerHTML=`<h2>${kind==="nail"?"Nail bed":"Lower eyelid"} result <span class="badge ${cat(imgLabel(s))}">${imgLabel(s)}</span></h2>
+  <div class="row"><img src="${s.photo}" alt="Analysed photo" style="max-width:260px;border-radius:8px"><span class="sw" style="background:rgb(${s.rgb})"></span><b>Average colour</b></div>
+  <div class="grid" style="margin-top:10px"><div class="stat"><b>${s.rgb.join(", ")}</b><span>RGB</span></div><div class="stat"><b>${s.hsv[0]}°, ${s.hsv[1]}%, ${s.hsv[2]}%</b><span>HSV</span></div>
+  <div class="stat"><b>${s.rejected?"–":s.pallor.toFixed(0)+"/100"}</b><span>Pallor score (0 red, 100 pale)</span></div><div class="stat"><b>${Q[s.level]}</b><span>Image quality</span></div></div>
+  <p class="msg">Glare ${s.glare}% · Shadow ${s.shadow}% · Usable ${s.usable}%${s.issues.length?" · "+esc(s.issues.join("; ")):""}</p>
+  <p class="msg">Screening estimate from colour only. Not a medical diagnosis.</p>`;
+}
+
+/* ================= Hb sensor ================= */
+const HB_TOL=0.2,HB_EPS=0.21;
+const hbDiffOk=d=>d<=HB_EPS;   /* d is rounded to 0.1, so 0.2 (or 0.2000000001) passes, 0.3 fails */
+const freshSensor=()=>({hb:null,ts:null,src:null,reads:[],status:"none",diff:null});
+function hbStatusText(s=S.sensor){
+  return s.status==="ok"?`Accepted: the two readings differ by ${s.diff} g/dL (allowed ${HB_TOL}). The average is used.`
+   :s.status==="retest"?`RETEST NEEDED: the two readings differ by ${s.diff} g/dL (allowed ${HB_TOL}). Take the Hb reading again.`
+   :s.status==="first"?"Reading 1 saved. Take a second reading to confirm.":"No Hb reading yet."}
+function setHb(v,src){
+  if(!(v>=2&&v<=25)){toast("Hb must be between 2 and 25 g/dL");return false}
+  v=+v.toFixed(1);
+  const now=new Date().toISOString(),reads=[...S.sensor.reads,{hb:v,src,ts:now}].slice(-2);
+  let status="first",hb=v,diff=null,fsrc=src;
+  if(reads.length===2){
+    diff=Math.round(Math.abs(reads[0].hb-reads[1].hb)*10)/10;
+    const sm=reads.find(x=>isSim(x.src));if(sm)fsrc=sm.src;
+    if(hbDiffOk(diff)){status="ok";hb=Math.round((reads[0].hb+reads[1].hb)/2*10)/10}
+    else{status="retest";hb=null}
+  }
+  S.sensor={hb,ts:now,src:fsrc,reads,status,diff};renderSensor();
+  toast(status==="ok"?`Readings agree (difference ${diff}). Hb = ${hb} g/dL`:status==="retest"?`Readings differ by ${diff} g/dL. Retest needed.`:"Reading 1 saved. Take a second reading.");
+  return true}
+function renderSensor(){const s=S.sensor,r=s.reads;
+  const badge=s.status==="ok"?"ok":s.status==="retest"?"bad":s.status==="first"?"warn":"na";
+  const label=s.status==="ok"?"Accepted":s.status==="retest"?"Retest needed":s.status==="first"?"Need 2nd reading":"No reading";
+  $("#sensBox").innerHTML=`<div class="grid"><div class="stat"><b>${s.hb==null?(s.status==="retest"?"Retest":"–"):s.hb+" g/dL"}</b><span>Hb value (final)</span></div>
+  <div class="stat"><b style="font-size:16px">${esc(S.conn)}</b><span>Sensor connection</span></div>
+  <div class="stat"><b style="font-size:16px">${fdt(s.ts)}</b><span>Last reading</span></div>
+  <div class="stat"><b style="font-size:16px"><span class="badge ${isSim(s.src)?"sim":s.src?"ok":"na"}">${srcLabel(s.src)}</span></b><span>Source</span></div></div>
+  <div class="tw" style="margin-top:12px"><table><tr><th>Reading 1</th><th>Reading 2</th><th>Difference</th><th>Allowed</th><th>Check</th></tr>
+  <tr><td>${r[0]?r[0].hb.toFixed(1)+" g/dL":"–"}</td><td>${r[1]?r[1].hb.toFixed(1)+" g/dL":"–"}</td><td>${s.diff==null?"–":s.diff.toFixed(1)+" g/dL"}</td><td>≤ ${HB_TOL} g/dL</td><td><span class="badge ${badge}">${label}</span></td></tr></table></div>
+  <p class="msg${s.status==="retest"?" e":""}">${esc(hbStatusText(s))}</p>`}
+$("#hbSet").onclick=()=>{const c=parseFloat($("#hctIn").value);if(isNaN(c))S.hct=null;else if(c>=5&&c<=70)S.hct=c;else return toast("Hct must be 5–70 %");setHb(parseFloat($("#hbIn").value),"manual")};
+$("#hbDemo").onclick=()=>{setHb(10.2,"demo")};
+function setVitals(){
+  const hr=parseFloat($("#hrIn").value),sp=parseFloat($("#spo2In").value),v={hr:null,spo2:null,src:"manual"};
+  if(!isNaN(hr)){if(hr>=30&&hr<=220)v.hr=Math.round(hr);else return toast("Pulse must be 30–220 bpm")}
+  if(!isNaN(sp)){if(sp>=50&&sp<=100)v.spo2=Math.round(sp*10)/10;else return toast("SpO₂ must be 50–100 %")}
+  S.vitals=(v.hr==null&&v.spo2==null)?null:v;renderProb();toast(S.vitals?"Pulse / SpO₂ saved":"Pulse / SpO₂ cleared")}
+$("#vitSet").onclick=setVitals;
+function serialVitals(line){
+  const h=line.match(/HR\s*[:=]?\s*(\d{2,3})/i),s=line.match(/SpO2?\s*[:=]?\s*(\d{2,3}(?:\.\d)?)/i);if(!h&&!s)return;
+  const v={hr:S.vitals?S.vitals.hr:null,spo2:S.vitals?S.vitals.spo2:null,src:"serial"};
+  if(h&&+h[1]>=30&&+h[1]<=220){v.hr=+h[1];$("#hrIn").value=v.hr}
+  if(s&&+s[1]>=50&&+s[1]<=100){v.spo2=+s[1];$("#spo2In").value=v.spo2}
+  S.vitals=v;renderProb()}
+$("#hbReset").onclick=()=>{S.sensor=freshSensor();HW.base=null;renderSensor();toast("Hb check reset. Take reading 1 again.")};
+$("#serOn").onclick=async()=>{
+  if(!("serial"in navigator)){toast("Web Serial not supported. Use Chrome or Edge on localhost/https.");return}
+  try{S.port=await navigator.serial.requestPort();await S.port.open({baudRate:115200});S.conn="Connected: USB serial (real)";renderSensor();
+    const dec=new TextDecoderStream();S.port.readable.pipeTo(dec.writable).catch(()=>{});S.reader=dec.readable.getReader();let buf="";
+    for(;;){const{value,done}=await S.reader.read();if(done)break;buf+=value;let i;
+      while((i=buf.indexOf("\n"))>=0){const m=buf.slice(0,i).match(/Hb\s*[:=]?\s*(\d+(?:\.\d+)?)/i)||buf.slice(0,i).match(/^\s*(\d+(?:\.\d+)?)\s*$/);serialVitals(buf.slice(0,i));buf=buf.slice(i+1);if(m)setHb(parseFloat(m[1]),"serial")}}
+  }catch(e){toast("Serial: "+e.message)}
+  S.conn="Not connected";S.reader=null;try{await S.port.close()}catch(e){}renderSensor()};
+$("#serOff").onclick=()=>{if(S.reader)S.reader.cancel().catch(()=>{});else toast("No real sensor is connected")};
+
+/* ================= hardware simulation ================= */
+const HW={on:false,pend:null,base:null};
+function hwLog(t){const l=$("#hwLog");l.textContent+=`[${new Date().toLocaleTimeString()}] ${t}\n`;l.scrollTop=l.scrollHeight}
+function hwUi(){$("#hwSt").textContent=HW.on?"Connected (SIMULATED)":"Disconnected";$("#hwPend").textContent=HW.pend==null?"none":HW.pend+" g/dL (simulated)"}
+$("#hwCon").onclick=()=>{HW.on=true;S.conn="Simulated ESP32 (DEMO)";hwLog("ESP32 simulator connected");hwUi();renderSensor()};
+$("#hwDis").onclick=()=>{HW.on=false;HW.pend=null;HW.base=null;S.conn="Not connected";hwLog("ESP32 simulator disconnected");hwUi();renderSensor()};
+$("#hwGen").onclick=()=>{if(!HW.on)return toast("Connect the simulated sensor first");if(HW.base==null)HW.base=6+Math.random()*8;
+  const off=Math.random()<.25?(.4+Math.random()*.4)*(Math.random()<.5?-1:1):(Math.random()*.4-.2);
+  HW.pend=+clamp(HW.base+off,2,25).toFixed(1);hwLog("Generated Hb "+HW.pend+" g/dL (SIMULATED)");hwUi()};
+$("#hwSend").onclick=()=>{if(!HW.on||HW.pend==null)return toast("Connect and generate a reading first");setHb(HW.pend,"sim");hwLog("Sent over simulated serial: Hb:"+HW.pend);HW.pend=null;hwUi()};
+hwLog("Simulator ready. All data here is DEMO / SIMULATED.");hwUi();
+
+/* ================= combined analysis ================= */
+function whoCuts(p){if(p.age<5)return[11,10,7];if(p.age<12)return[11.5,11,8];if(p.age<15)return[12,11,8];
+  if(p.gender==="Female")return p.preg?[11,10,7]:[12,11,8];return[13,11,8]}
+const GROUPS=["No anaemia range","Mild range","Moderate range","Severe range"];
+function makeRecord(){
+  const p=S.patient,sn=S.sensor,sc=["nail","eye"].map(k=>S.scans[k]).filter(Boolean),use=sc.filter(s=>!s.rejected&&s.level<2);
+  let hbIdx=null;if(p&&sn.hb!=null){const c=whoCuts(p);hbIdx=sn.hb>=c[0]?0:sn.hb>=c[1]?1:sn.hb>=c[2]?2:3}
+  const pal=use.length?use.reduce((a,s)=>a+s.pallor*(s.level?.6:1),0)/use.reduce((a,s)=>a+(s.level?.6:1),0):null;
+  let st=pal==null?null:pal<40?"normal":pal<60?"borderline":"pale";
+  {const sts=use.map(imgState);if(sts.includes("normal")&&sts.includes("pale"))st="borderline"}
+  const img=pal!=null?({normal:"Normal Screening Range",borderline:"Needs Further Testing",pale:"Possible Anaemia"})[st]:sc.length?"Insufficient Image Quality":"Not scanned";
+  const q=use.length?(use.every(s=>s.level===0)?"Good":"Moderate"):sc.length?"Poor":"–";
+  let agree="n/a";if(hbIdx!=null&&st)agree=st==="borderline"?"Partial":((hbIdx>0&&st==="pale")||(hbIdx===0&&st==="normal"))?"Agree":"Disagree";
+  let comb;
+  if(hbIdx==null&&!st)comb=sc.length?"Insufficient Image Quality":"Insufficient Data";
+  else if(agree==="Disagree"||agree==="Partial")comb="Needs Further Testing";
+  else if(hbIdx!=null)comb=hbIdx>0?"Possible Anaemia":"Normal Screening Range";
+  else comb=st==="pale"?"Possible Anaemia":st==="normal"?"Normal Screening Range":"Needs Further Testing";
+  if(sn.status==="retest")comb="Needs Further Testing";
+  const prob=screenProb(p,S.scans,S.vitals);if(prob.status==="fail")comb="Needs Further Testing";
+  const sim=isSim(sn.src);
+  const lab=k=>S.scans[k]?imgLabel(S.scans[k]):"Not scanned",lg=sc.length?["Good","Acceptable","Poor"][Math.max(...sc.map(s=>s.level))]:"–";
+  let ref="Use applicable clinical reference";
+  if(p){const c=whoCuts(p),g=p.age<5?"children 6–59 months":p.age<12?"children 5–11 y":p.age<15?"children 12–14 y":p.gender==="Female"?(p.preg?"pregnant women":"non-pregnant women"):"men";ref=`≥ ${c[0]} g/dL (WHO, ${g})`}
+  const conf0=(hbIdx!=null&&st&&agree==="Agree"&&q==="Good"&&!sim&&sn.status==="ok")?"Higher":((hbIdx!=null||st)&&!sim&&agree!=="Disagree")?"Moderate":"Low";
+  const conf=sn.status==="retest"?"Low":conf0;
+  const adv={"Normal Screening Range":"No concern from this screening. Keep a balanced iron-rich diet and re-screen if symptoms appear.","Possible Anaemia":"Confirm with a laboratory haemoglobin test (CBC) at a health centre. See a doctor soon"+(hbIdx===3?" (Hb in the severe range: seek care the same day).":"."),
+    "Needs Further Testing":"Signals are borderline or disagree. Re-scan in shade/even light and confirm with a laboratory haemoglobin test.","Insufficient Image Quality":"Retake the photo (no flash, even light, correct area) or enter an Hb reading.","Insufficient Data":"Add an image scan and/or an Hb reading."}[comb];
+  return{rid:S.rid||"–",centre:p?p.centre:"",by:p?p.by:"",hct:S.hct,nail:lab("nail"),eye:lab("eye"),light:lg,ref,id:p?p.id:"–",name:p?p.name:"–",age:p?p.age:null,gender:p?p.gender:"–",village:p?p.village:"",phone:p?p.phone:"",preg:p?p.preg:false,hist:p?p.hist:"–",symptoms:p?p.symptoms:[],
+    dt:new Date().toISOString(),hb:sn.hb,hbSrc:sn.src,hbTs:sn.ts,hbClass:hbIdx==null?"–":GROUPS[hbIdx],img,pallor:pal==null?null:Math.round(pal),quality:q,
+    feat:sc.map(s=>({kind:s.kind,rgb:s.rgb,hsv:s.hsv,pallor:s.rejected?null:s.pallor,quality:Q[s.level],rejected:s.rejected})),agree,conf,combined:comb,advice:(prob.status==="fail"?"Image consistency failed. Retake the fingernail and lower eyelid images. ":"")+(sn.status==="retest"?`The two Hb readings differ by ${sn.diff} g/dL (allowed ${HB_TOL}). Retest the Hb before relying on this result. `:"")+adv,hbStatus:sn.status,hbDiff:sn.diff,hbReads:(sn.reads||[]).map(x=>x.hb),prob,vitals:S.vitals||null,
+    status:"SCREENING — NOT A DIAGNOSIS",sim,noPatient:!p};
+}
+const BOX={"Normal Screening Range":"NORMAL SCREENING RANGE – NO CONCERN FROM THIS SCREENING","Possible Anaemia":"POSSIBLE ANAEMIA – FURTHER EVALUATION RECOMMENDED","Needs Further Testing":"NEEDS FURTHER TESTING – REPEAT SCREENING / LAB CONFIRMATION"};
+/* ===== Hb estimate from each image + anaemia probability (deterministic, no random values) ===== */
+const HB_AT_PALLOR0=15.5,HB_AT_PALLOR100=6.0;           /* prototype calibration: pallor 0 -> 15.5 g/dL, 100 -> 6.0 g/dL */
+const hbFromPallor=pl=>Math.round(clamp(HB_AT_PALLOR0-(HB_AT_PALLOR0-HB_AT_PALLOR100)*pl/100,5,16)*10)/10;
+const sigmoid=x=>1/(1+Math.exp(-x));
+const RISK=[
+  {max:20,name:"Very Low Risk",col:"#1a7f4b",bg:"#e4f5ec",txt:"This pattern is unlikely to be anaemia."},
+  {max:40,name:"Low Risk",col:"#4d8f1d",bg:"#eef8dc",txt:"Anaemia is unlikely, but re-screen if symptoms such as tiredness or dizziness appear."},
+  {max:60,name:"Moderate Risk",col:"#8a6d00",bg:"#fff6c4",txt:"Anaemia is possible. A laboratory Hb test is advised to confirm."},
+  {max:80,name:"High Risk",col:"#c2570c",bg:"#ffe6cf",txt:"Anaemia is likely. Please get a laboratory Hb test soon."},
+  {max:100,name:"Very High Risk",col:"#b42318",bg:"#fde8e6",txt:"Anaemia is very likely. Please see a health professional and get a laboratory Hb test as soon as possible."}];
+const riskOf=pr=>RISK.find(r=>pr<=r.max)||RISK[RISK.length-1];
+const MSG_FAIL="Image consistency failed. Please retake the fingernail and lower eyelid images.";
+const MSG_FAIL2="The two Hb values are not consistent. Please retake the images for a new analysis.";
+const MSG_OK="Result is consistent. Proceed to the next step.";
+function screenProb(p,scans,vit){
+  const n=scans.nail,e=scans.eye;
+  if(!n||!e)return{status:"incomplete",msg:"Complete both image checks (fingernail and lower eyelid) to get the probability score."};
+  if([n,e].some(s=>s.rejected||s.level===2||!isFinite(s.pallor)))return{status:"quality",msg:"One or both images have insufficient quality. Please retake the fingernail and lower eyelid images."};
+  const hb1=hbFromPallor(n.pallor),hb2=hbFromPallor(e.pallor);
+  const diff=Math.round(Math.abs(hb1-hb2)*10)/10;
+  if(!hbDiffOk(diff))return{status:"fail",hb1,hb2,diff,msg:MSG_FAIL,detail:MSG_FAIL2};
+  const hb=Math.round((hb1+hb2)/2*10)/10,thr=p?whoCuts(p)[0]:12;
+  /* 1) Hb is the primary factor: logistic centred just below the WHO anaemia cut-off */
+  let z=(thr-0.5-hb)/0.9;
+  /* 2) image agreement: closer Hb estimates -> more confident; lower image quality -> less confident */
+  z*=(1+0.15*(1-clamp(diff/HB_TOL,0,1)))*((n.level===0&&e.level===0)?1:0.9);
+  /* 3) optional MAX30102 pulse and SpO2 (small, capped adjustment) */
+  let adj=0;const notes=[];
+  if(vit&&vit.hr!=null&&vit.hr>=30&&vit.hr<=220){
+    if(vit.hr>100){adj+=0.6;notes.push(`Pulse ${vit.hr} bpm is high, which can go with anaemia and slightly raises the score.`)}
+    else if(vit.hr>90){adj+=0.3;notes.push(`Pulse ${vit.hr} bpm is a little high and slightly raises the score.`)}
+    else notes.push(`Pulse ${vit.hr} bpm is in the usual range.`)}
+  if(vit&&vit.spo2!=null&&vit.spo2>=50&&vit.spo2<=100){
+    if(vit.spo2<94){adj+=0.3;notes.push(`SpO₂ ${vit.spo2}% is low and slightly raises the score. Clinical review is advised.`)}
+    else notes.push(`SpO₂ ${vit.spo2}% is normal.`)}
+  adj=Math.min(adj,0.9);
+  z=clamp(z+adj,-6,6);
+  const prob=clamp(Math.round(sigmoid(z)*100),0,100),risk=riskOf(prob);
+  const explain=`The estimated Hb is ${hb.toFixed(1)} g/dL (fingernail ${hb1.toFixed(1)}, lower eyelid ${hb2.toFixed(1)}), which is ${hb>=thr?"at or above":"below"} the reference of ${thr} g/dL for this patient. The two images agree within ${diff.toFixed(1)} g/dL. ${notes.join(" ")} ${risk.txt}`.replace(/\s+/g," ").trim();
+  return{status:"ok",hb1,hb2,diff,hb,thr,prob,risk,notes,explain}
+}
+function probHTML(pr,rep){
+  if(!pr)return"";
+  const head=rep?'<div class="sec">Anaemia probability score (screening)</div>':'<h2>Anaemia probability score</h2>',nc=rep?"note":"msg";
+  const disc="This is a screening result only. It does not replace a laboratory hemoglobin test or medical diagnosis.";
+  if(pr.status==="incomplete"||pr.status==="quality")return`${head}<p class="${nc}">${esc(pr.msg)}</p>`;
+  const tbl=`<table><tr><th>Fingernail Hb estimate</th><th>Lower eyelid Hb estimate</th><th>Difference</th></tr><tr><td>${pr.hb1.toFixed(1)} g/dL</td><td>${pr.hb2.toFixed(1)} g/dL</td><td>${pr.diff.toFixed(1)} g/dL (allowed ${HB_TOL})</td></tr></table>`;
+  if(pr.status==="fail")return`${head}<div style="background:#fde8e6;color:#b42318;border:2px solid #b42318;border-radius:8px;padding:12px;font-weight:800;margin:8px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact">${esc(pr.msg)}</div><p>${esc(pr.detail)}</p>${tbl}<p class="${nc}">${disc}</p>`;
+  const r=pr.risk;
+  return`${head}<p style="color:#1a7f4b;font-weight:700;margin:4px 0">${MSG_OK}</p>${tbl}
+  <div style="margin:10px 0;padding:12px;border-radius:8px;border:2px solid ${r.col};background:${r.bg};color:${r.col};-webkit-print-color-adjust:exact;print-color-adjust:exact">
+   <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between">
+    <div><div style="font-size:12px;font-weight:700">Estimated Hb</div><div style="font-size:28px;font-weight:800">${pr.hb.toFixed(1)} <span style="font-size:14px">g/dL</span></div></div>
+    <div><div style="font-size:12px;font-weight:700">Anaemia probability score</div><div style="font-size:28px;font-weight:800">${pr.prob}%</div></div>
+    <div><div style="font-size:12px;font-weight:700">Risk level</div><div style="font-size:20px;font-weight:800">${esc(r.name)}</div></div></div>
+   <div style="height:10px;background:rgba(0,0,0,.12);border-radius:6px;margin-top:10px;overflow:hidden"><div style="height:100%;width:${pr.prob}%;background:${r.col}"></div></div></div>
+  <p><b>What this means:</b> ${esc(pr.explain)}</p><p class="${nc}">${disc}</p>`}
+function renderProb(){const el=$("#probCard");if(el)el.innerHTML=probHTML(screenProb(S.patient,S.scans,S.vitals),false)}
+function chkHTML(r){
+  const feat=r.feat||[];
+  const row=(n,k,nm)=>{const x=feat.find(f=>f.kind===k);
+    if(!x)return`<tr><td>Check ${n}</td><td>${nm}</td><td>–</td><td>–</td><td>Not done</td></tr>`;
+    return`<tr><td>Check ${n}</td><td>${nm}</td><td>${x.rejected||x.pallor==null?"–":Math.round(x.pallor)+"/100"}</td><td>${esc(x.quality)}</td><td>${esc(r[k])}</td></tr>`};
+  const good=feat.filter(f=>!f.rejected&&f.quality!=="Poor");
+  const note=feat.length<2?"Only one check done. Do the second check (the other site) to confirm the result.":
+    good.length<2?"One check had poor quality. Retake it for a reliable two-check result.":
+    r.nail===r.eye?"Both checks give the same result.":"The two checks differ. Repeat in even daylight and confirm with a laboratory Hb test.";
+  return`<div class="sec">Two-check summary</div><table><tr><th>Check</th><th>Site</th><th>Pallor score</th><th>Image quality</th><th>Result</th></tr>${row(1,"nail","Nail bed")}${row(2,"eye","Lower eyelid (conjunctiva)")}</table><p class="note">${note}</p>`}
+function hbChkHTML(r){const x=r.hbReads;if(!x||!x.length)return"";
+  const st=r.hbStatus==="ok"?"Accepted (average used)":r.hbStatus==="retest"?"Retest needed":"Second reading pending";
+  return`<div class="sec">Hb two-reading check</div><table><tr><th>Reading 1</th><th>Reading 2</th><th>Difference</th><th>Allowed</th><th>Status</th></tr><tr><td>${x[0].toFixed(1)} g/dL</td><td>${x[1]!=null?x[1].toFixed(1)+" g/dL":"–"}</td><td>${r.hbDiff==null?"–":r.hbDiff.toFixed(1)+" g/dL"}</td><td>≤ ${HB_TOL} g/dL</td><td>${st}</td></tr></table>${r.hbStatus==="retest"?'<p class="note">The two readings differ too much. Repeat the Hb measurement.</p>':""}`}
+function reportHTML(r){
+  const d=(v,x="–")=>v==null||v===""?x:esc(v),hb=r.hb==null?(r.hbStatus==="retest"?"Retest needed":"Not recorded"):r.hb+" g/dL",sec=t=>`<div class="sec">${t}</div>`,feat=r.feat||[];
+  const irow=(k,nm)=>{const x=feat.find(f=>f.kind===k);return`<tr><td>${nm}</td><td>${x?(x.rejected?"Region rejected – retake":d(r[k]))+` · RGB ${x.rgb.join(",")} · HSV ${x.hsv.join(",")}`:"Not scanned"}</td><td>${x?(x.rejected?"Rejected":"Completed"):"Not performed"}</td></tr>`};
+  const done=r.combined.startsWith("Insufficient")?"Incomplete":"Completed",scanned=feat.length>0;
+  const hbCls=!r.hbSrc?"–":isSim(r.hbSrc)?"Demonstration (not a verified clinical measurement)":r.hbSrc==="manual"?"Manually entered":"Sensor reading (unverified)";
+  const syms=SYMS.map(s=>(r.symptoms.includes(s)?"☑ ":"☐ ")+s).concat((r.hist==="Yes"?"☑ ":"☐ ")+"Previous anaemia history").join(" &nbsp; ");
+  const interp=r.agree==="Agree"?"Image and Hb agree":r.agree==="n/a"?"Single source only":"Image and Hb differ";
+  const recs=[r.advice,"Repeat screening if image quality or lighting is inadequate.","Consider laboratory haemoglobin testing for confirmation.","Consult a qualified healthcare professional if anaemia is suspected."];
+  return`<div class="rp">
+<div class="rh"><img src="${LOGO}" alt="RedLens AI"><div class="t"><h2>ANEMIA SCREENING REPORT</h2><div>Non-Invasive Anaemia Screening System</div></div></div>
+<div class="rm"><div><b>Report ID:</b> ${d(r.rid)}</div><div><b>Date &amp; time:</b> ${fdt(r.dt)}</div><div><b>Screening centre:</b> ${d(r.centre)}</div><div><b>Screened by:</b> ${d(r.by)}</div></div>
+<div class="dm">DEMO / PROTOTYPE SCREENING${r.sim?" · DEMO / SIMULATED Hb":""}</div>
+${sec("Patient information")}
+<table><tr><th>Patient ID</th><th>Patient name</th><th>Age</th><th>Gender</th></tr><tr><td>${d(r.id)}</td><td>${d(r.name)}</td><td>${d(r.age)}</td><td>${d(r.gender)}${r.preg?" (pregnant)":""}</td></tr>
+<tr><th>Village / location</th><th>Contact</th><th>Anaemia history</th><th>Registration type</th></tr><tr><td>${d(r.village)}</td><td>${d(r.phone,"Not recorded")}</td><td>${d(r.hist)}</td><td>Prototype</td></tr></table>
+${sec("Screening summary")}
+<table><tr><th>Haemoglobin</th><th>Haematocrit</th><th>Image quality</th><th>Analysis status</th></tr><tr><td>${hb}<br><small>${hbCls}</small></td><td>${r.hct==null?"Not recorded":r.hct+" %"}</td><td>${d(r.quality)}</td><td>${done}</td></tr></table>
+${sec("Non-invasive image assessment")}
+<table><tr><th>Assessment</th><th>Result</th><th>Status</th></tr>${irow("nail","Nail-bed analysis")}${irow("eye","Conjunctiva analysis")}
+<tr><td>Lighting quality</td><td>${d(r.light)}</td><td>${scanned?"Completed":"Not performed"}</td></tr><tr><td>Image quality</td><td>${d(r.quality)}</td><td>${scanned?"Completed":"Not performed"}</td></tr>
+<tr><td>Region of interest</td><td>${scanned?"Selected by operator":"Not selected"}</td><td>${scanned?"Completed":"Not performed"}</td></tr><tr><td>OpenCV processing</td><td>${scanned?"Colour features extracted":"–"}</td><td>${scanned?"Completed":"Not performed"}</td></tr></table>
+<p class="note">Clinical limitation: image colour analysis alone cannot diagnose anaemia and may be influenced by lighting, camera characteristics and individual variation.</p>
+${chkHTML(r)}
+${hbChkHTML(r)}
+${probHTML(r.prob,true)}
+${sec("Haemoglobin / sensor measurements")}
+<table><tr><th>Parameter</th><th>Value</th><th>Data source</th><th>Data classification</th></tr><tr><td>Haemoglobin</td><td>${hb}</td><td>${srcLabel(r.hbSrc)}</td><td>${hbCls}</td></tr>
+<tr><td>Haematocrit</td><td>${r.hct==null?"Not recorded":r.hct+" %"}</td><td>${r.hct==null?"–":"Manual entry"}</td><td>${r.hct==null?"–":"Manually entered"}</td></tr></table>
+${sec("Screening analysis (rule-based)")}
+<table><tr><th>Component</th><th>Finding</th></tr><tr><td>Image analysis</td><td>${d(r.img)}</td></tr><tr><td>Hb analysis</td><td>${r.hb==null?"Not recorded":d(r.hbClass)+(r.sim?" (demo value, needs clinical correlation)":"")}</td></tr>
+<tr><td>Combined screening</td><td>${d(r.combined)}</td></tr><tr><td>Screening confidence</td><td>${d(r.conf)}</td></tr><tr><td>Analysis status</td><td>${done}</td></tr></table>
+${sec("Screening result")}
+<div class="rb ${cat(r.combined)}">${esc(BOX[r.combined]||r.combined.toUpperCase())}</div>
+<p style="text-align:center"><b>Hb:</b> ${hb} &nbsp; <b>Confidence:</b> ${d(r.conf)} &nbsp; <b>Image quality:</b> ${d(r.quality)} &nbsp; <b>Result type:</b> Screening indication</p>
+<p class="note" style="text-align:center">This is a screening indication and not a confirmed diagnosis.</p>
+${sec("Result comparison")}
+<table><tr><th>Parameter</th><th>Sensor value</th><th>Image analysis</th><th>Reference / expected range</th><th>Interpretation</th></tr>
+<tr><td>Haemoglobin</td><td>${hb}</td><td>${d(r.img)}</td><td>${d(r.ref)}</td><td>${interp}</td></tr>
+<tr><td>Haematocrit</td><td>${r.hct==null?"–":r.hct+" %"}</td><td>Not directly assessed</td><td>Use applicable clinical reference</td><td>Screening context</td></tr>
+<tr><td>Image quality</td><td>–</td><td>${d(r.quality)}</td><td>Adequate for analysis</td><td>${r.quality==="Good"?"Acceptable":"Check"}</td></tr></table>
+${r.agree==="Disagree"||r.agree==="Partial"?`<p class="note">Results show disagreement. Repeat screening and laboratory confirmation should be considered.</p>`:""}
+${sec("Screening history")}<p>${syms}</p><p class="note">Symptoms and risk factors are recorded for screening context and are not diagnostic by themselves.</p>
+${sec("Recommendation")}<ol>${recs.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>
+${sec("Screening method")}<p>Non-invasive image analysis (OpenCV.js colour features from the selected nail-bed or conjunctiva region) is combined with the available Hb reading to give a screening indication. It requires clinical confirmation.</p>
+${sec("Technical information")}
+<table><tr><th>Parameter</th><th>Details</th></tr><tr><td>Software version</td><td>AnemiaScan v2.0 (prototype)</td></tr><tr><td>AI model</td><td>None (rule-based colour analysis)</td></tr><tr><td>Computer vision</td><td>OpenCV.js</td></tr>
+<tr><td>Sensor</td><td>${srcLabel(r.hbSrc)}</td></tr><tr><td>Calibration</td><td>None (prototype thresholds)</td></tr><tr><td>Processing status</td><td>${done}</td></tr><tr><td>Processing date/time</td><td>${fdt(r.dt)}</td></tr></table>
+${sec("Important medical disclaimer")}<p>This report provides an anaemia screening indication and is not a confirmed medical diagnosis. It should not be used alone to make medical or treatment decisions. If anaemia is suspected, appropriate clinical evaluation and laboratory testing should be considered. Image-based analysis may be affected by lighting, camera quality, skin or eye characteristics and other factors.</p>
+${sec("Report verification")}
+<div class="sg"><div><b>Screened by:</b> ${d(r.by,"____________")}<br><br>Signature: ______________________<br><br>Date: ______________________</div><div><b>Verified by:</b> Authorized personnel<br><br>Signature: ______________________<br><br>Verification code: ${d(r.rid)}</div></div>
+<p class="note" style="margin-top:10px">PROTOTYPE NOTICE: designed for academic, hackathon, demonstration and digital-health prototype use. It is not issued by or on behalf of a real hospital, laboratory, government organization or physician.</p>
+<div class="rf">AnemiaScan Prototype Screening Report • ${r.sim?"DEMO DATA • ":""}Not for clinical diagnosis</div></div>`}
+
+/* ================= result ================= */
+function renderResult(){
+  if(!S.patient){$("#resCard").innerHTML="<h2>Result</h2><p>Register a patient first (Patient tab), then add an image scan and an Hb reading.</p>";S.rec=null;return}
+  S.rec=makeRecord();$("#resCard").innerHTML=reportHTML(S.rec)}
+$("#rescan").onclick=()=>{S.scans={nail:null,eye:null};clearImage();show("img")};
+$("#resSave").onclick=()=>{if(!S.rec)return toast("Nothing to save yet");const l=load().filter(x=>!(x.id===S.rec.id&&x.dt===S.rec.dt));l.unshift(S.rec);store(l);toast("Result saved to history")};
+function printRec(r){$("#printArea").innerHTML=reportHTML(r);window.print()}
+$("#resPrint").onclick=()=>S.rec?printRec(S.rec):toast("Nothing to print yet");
+function download(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+$("#resDl").onclick=()=>{if(!S.rec)return toast("Nothing to download yet");
+  download(`AnemiaScan-${S.rec.id}.html`,`<!DOCTYPE html><meta charset="utf-8"><title>AnemiaScan report</title><style>${REPCSS}body{max-width:820px;margin:20px auto}</style>${reportHTML(S.rec)}`,"text/html")};
+
+/* ================= history ================= */
+function renderHist(){
+  const q=$("#hq").value.toLowerCase(),f=$("#hf").value,all=load();
+  const l=all.filter(r=>(!q||(r.id+" "+r.name).toLowerCase().includes(q))&&(!f||r.combined.startsWith(f)));
+  $("#hist").innerHTML=l.length?`<table><tr><th>Patient ID</th><th>Name</th><th>Date</th><th>Hb</th><th>Image</th><th>Combined</th><th>Quality</th><th>Status</th><th></th></tr>`+
+   l.map(r=>`<tr><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${new Date(r.dt).toLocaleDateString()}</td><td>${r.hb==null?(r.hbStatus==="retest"?"Retest":"–"):r.hb}${isSim(r.hbSrc)?" (demo)":""}</td><td>${esc(r.img)}</td>
+   <td><span class="badge ${cat(r.combined)}">${esc(r.combined)}</span></td><td>${esc(r.quality)}</td><td>Screening</td>
+   <td><button class="btn" data-v="${esc(r.dt)}|${esc(r.id)}">View</button><button class="btn d" data-x="${esc(r.dt)}|${esc(r.id)}">Delete</button></td></tr>`).join("")+"</table>":"<p class='msg'>No saved records match.</p>";
+}
+$("#hq").oninput=renderHist;$("#hf").onchange=renderHist;
+const findRec=k=>load().find(r=>r.dt+"|"+r.id===k);
+$("#hist").addEventListener("click",e=>{const v=e.target.dataset.v,x=e.target.dataset.x;
+  if(v){const r=findRec(v);if(r){S.view=r;$("#modalBody").innerHTML=reportHTML(r);$("#modal").style.display="flex"}}
+  if(x&&confirm("Delete this record?")){store(load().filter(r=>r.dt+"|"+r.id!==x));renderHist();toast("Deleted")}});
+$("#mClose").onclick=()=>$("#modal").style.display="none";$("#mPrint").onclick=()=>S.view&&printRec(S.view);
+$("#json").onclick=()=>{const l=load();l.length?download("anemiascan-history.json",JSON.stringify(l,null,2),"application/json"):toast("No records to export")};
+$("#csv").onclick=()=>{const l=load();if(!l.length)return toast("No records to export");
+  const cell=v=>{let s=String(v??"");if(/^[=+\-@]/.test(s))s="'"+s;return`"${s.replace(/"/g,'""')}"`};
+  const h=["Patient ID","Name","Age","Gender","Date","Hb (g/dL)","Hb source","Image result","Combined result","Image quality","Status"];
+  download("anemiascan-history.csv",[h,...l.map(r=>[r.id,r.name,r.age,r.gender,r.dt,r.hb,srcLabel(r.hbSrc),r.img,r.combined,r.quality,r.status])].map(x=>x.map(cell).join(",")).join("\n"),"text/csv")};
+
+/* ================= dashboard ================= */
+function renderDash(){
+  const l=load(),n=k=>l.filter(r=>r.combined.startsWith(k)).length;
+  $("#stats").innerHTML=[["Total screened",l.length],["Normal screening range",n("Normal")],["Possible anaemia",n("Possible")],["Needs further testing",n("Needs")]].map(([k,v])=>`<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
+  const p=S.patient,r=p?makeRecord():null;
+  $("#cur").innerHTML=p?`<div class="grid"><div><span class="msg">Patient ID</span><br><b>${esc(p.id)}</b></div><div><span class="msg">Name</span><br><b>${esc(p.name)}</b></div><div><span class="msg">Age / Gender</span><br><b>${p.age} / ${esc(p.gender)}</b></div>
+   <div><span class="msg">Screening date/time</span><br><b>${fdt(p.dt)}</b></div><div><span class="msg">Hb sensor value</span><br><b>${S.sensor.hb==null?(S.sensor.status==="retest"?"Retest needed":"Not recorded"):S.sensor.hb+" g/dL"}</b>${isSim(S.sensor.src)?' <span class="badge sim">DEMO</span>':""}</div>
+   <div><span class="msg">Image-analysis status</span><br><b>${esc(r.img)}</b></div><div><span class="msg">Screening status</span><br><span class="badge warn">In progress – not a diagnosis</span></div>
+   <div><span class="msg">Final screening result</span><br><span class="badge ${cat(r.combined)}">${esc(r.combined)}</span></div></div>`:`<p class="msg">No active screening. Press “New Patient” to begin.</p>`;
+  $("#recent").innerHTML=l.length?`<table><tr><th>ID</th><th>Name</th><th>Date</th><th>Hb</th><th>Result</th></tr>`+l.slice(0,5).map(r=>`<tr><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${new Date(r.dt).toLocaleDateString()}</td><td>${r.hb==null?"–":r.hb}</td><td><span class="badge ${cat(r.combined)}">${esc(r.combined)}</span></td></tr>`).join("")+"</table>":"<p class='msg'>No saved screenings yet.</p>";
+}
+$("#mClose").addEventListener("click",()=>{});
+renderDash();renderSensor();renderScan();
+</script>
+<!-- ============================================================
+  AnemiaScan AI Help Chat  (text + voice, all languages)
+  HOW TO ADD: paste this WHOLE block just before </body> in your AnemiaScan file.
+  Nothing else in your code needs to change.
+============================================================= -->
+<style>
+#aic-fab{position:fixed;right:18px;bottom:18px;z-index:40;width:60px;height:60px;border-radius:50%;border:0;background:#0f5c7a;color:#fff;font-size:26px;cursor:pointer;box-shadow:0 4px 14px #0004;display:flex;align-items:center;justify-content:center}
+#aic-fab:hover{background:#0a4258}
+#aic-dot{position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#f2b705;border:2px solid #fff;display:none}
+#aic-panel{position:fixed;right:18px;bottom:90px;z-index:40;width:380px;max-width:calc(100vw - 24px);height:560px;max-height:calc(100vh - 110px);background:#fff;border:1px solid #d9e2e8;border-radius:14px;box-shadow:0 10px 30px #0004;display:none;flex-direction:column;overflow:hidden;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#16222b}
+#aic-panel.open{display:flex}
+.aic-head{background:#0a4258;color:#fff;padding:10px 12px;display:flex;align-items:center;gap:8px}
+.aic-head b{flex:1;font-size:15px}.aic-head small{display:block;font-weight:400;opacity:.85;font-size:11px}
+.aic-ib{background:#ffffff22;border:0;color:#fff;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px}
+.aic-ib:hover{background:#ffffff44}.aic-ib.off{opacity:.5}
+#aic-set{display:none;padding:10px 12px;background:#f4f7f9;border-bottom:1px solid #d9e2e8;font-size:12px;overflow:auto;max-height:55%}
+#aic-set.open{display:block}
+#aic-set label{display:block;font-weight:600;margin-top:6px;color:#33444f}
+#aic-set input,#aic-set select{width:100%;margin-top:3px;padding:7px;font-size:13px;border:1.5px solid #d9e2e8;border-radius:6px;background:#fff}
+#aic-set .n{color:#5d6b76;margin-top:6px}
+#aic-set button{margin-top:8px;border:2px solid #0f5c7a;background:#0f5c7a;color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer}
+#aic-msgs{flex:1;overflow-y:auto;padding:10px 12px;background:#eef3f6;display:flex;flex-direction:column;gap:8px}
+.aic-m{max-width:88%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.aic-m.u{align-self:flex-end;background:#0f5c7a;color:#fff;border-bottom-right-radius:3px}
+.aic-m.b{align-self:flex-start;background:#fff;border:1px solid #d9e2e8;border-bottom-left-radius:3px}
+.aic-m.e{align-self:flex-start;background:#fde8e6;color:#b42318;border:1px solid #b42318}
+.aic-m.t{align-self:flex-start;background:#fff;border:1px solid #d9e2e8;color:#5d6b76;font-style:italic}
+.aic-m button.aic-say{display:block;margin-top:6px;border:1px solid #d9e2e8;background:#f4f7f9;border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer}
+#aic-chips{padding:6px 10px;display:flex;flex-wrap:wrap;gap:6px;background:#eef3f6;border-top:1px solid #d9e2e8;max-height:96px;overflow:auto}
+#aic-chips button{border:1.5px solid #0f5c7a;background:#fff;color:#0f5c7a;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer}
+#aic-chips button.hot{background:#fff3d1;border-color:#9a6700;color:#9a6700}
+.aic-in{display:flex;gap:6px;padding:8px;border-top:1px solid #d9e2e8;background:#fff;align-items:flex-end}
+#aic-txt{flex:1;resize:none;max-height:90px;min-height:38px;padding:8px;font:14px/1.4 inherit;border:1.5px solid #d9e2e8;border-radius:8px}
+#aic-txt:focus{outline:2px solid #0f5c7a;border-color:#0f5c7a}
+.aic-in button{width:40px;height:40px;border-radius:8px;border:0;background:#0f5c7a;color:#fff;font-size:18px;cursor:pointer;flex:none}
+.aic-in button:disabled{opacity:.45;cursor:not-allowed}
+#aic-mic.rec{background:#b42318;animation:aicp 1s infinite}
+@keyframes aicp{50%{opacity:.55}}
+.aic-foot{font-size:10.5px;color:#5d6b76;padding:3px 10px 6px;background:#fff}
+@media (max-width:480px){#aic-panel{right:8px;left:8px;width:auto;max-width:none;bottom:84px}}
+</style>
+
+<button id="aic-fab" type="button" aria-label="Open AI help chat" title="AI help">💬<span id="aic-dot"></span></button>
+<div id="aic-panel" role="dialog" aria-label="AI help chat">
+  <div class="aic-head">
+    <b>AI Help<small>Ask in any language · text or voice</small></b>
+    <button class="aic-ib" id="aic-spk" type="button" title="Read answers aloud (on/off)">🔊</button>
+    <button class="aic-ib" id="aic-gear" type="button" title="Settings">⚙</button>
+    <button class="aic-ib" id="aic-new" type="button" title="Clear chat">🗑</button>
+    <button class="aic-ib" id="aic-x" type="button" title="Close">✕</button>
+  </div>
+  <div id="aic-set">
+    <label>Gemini API key (stored only in this browser)
+      <input id="aic-key" type="password" autocomplete="off" placeholder="AIza... / AQ...."></label>
+    <label>Proxy / backend URL (optional, recommended for real use)
+      <input id="aic-ep" type="url" placeholder="https://your-server/chat  (leave empty for direct Gemini API)"></label>
+    <label>Model
+      <input id="aic-model" type="text" placeholder="gemini-flash-latest"></label>
+    <label>Voice input language
+      <select id="aic-lang">
+        <option value="auto">Auto (browser / last reply language)</option>
+        <option value="ta-IN">தமிழ் (Tamil)</option><option value="en-IN">English (India)</option><option value="en-US">English (US)</option>
+        <option value="hi-IN">हिन्दी (Hindi)</option><option value="te-IN">తెలుగు (Telugu)</option><option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
+        <option value="ml-IN">മലയാളം (Malayalam)</option><option value="mr-IN">मराठी (Marathi)</option><option value="bn-IN">বাংলা (Bengali)</option>
+        <option value="gu-IN">ગુજરાતી (Gujarati)</option><option value="pa-IN">ਪੰਜਾਬੀ (Punjabi)</option><option value="ur-PK">اردو (Urdu)</option>
+        <option value="ne-NP">नेपाली (Nepali)</option><option value="si-LK">සිංහල (Sinhala)</option>
+        <option value="ar-SA">العربية (Arabic)</option><option value="es-ES">Español</option><option value="fr-FR">Français</option>
+        <option value="de-DE">Deutsch</option><option value="pt-BR">Português</option><option value="ru-RU">Русский</option>
+        <option value="zh-CN">中文</option><option value="ja-JP">日本語</option><option value="ko-KR">한국어</option>
+        <option value="id-ID">Bahasa Indonesia</option><option value="sw-KE">Kiswahili</option>
+      </select></label>
+    <p class="n">Typing works in every language. For voice, the browser listens in the language selected above (Chrome / Edge / Safari). The AI always replies in the language you write or speak.</p>
+    <p class="n">⚠ A key saved in the browser is fine for a prototype only. For a real deployment, send requests through your own server (Proxy URL) so the key stays secret.</p>
+    <button id="aic-save" type="button">Save settings</button>
+  </div>
+  <div id="aic-msgs" aria-live="polite"></div>
+  <div id="aic-chips"></div>
+  <div class="aic-in">
+    <button id="aic-mic" type="button" title="Speak" aria-label="Speak">🎤</button>
+    <textarea id="aic-txt" rows="1" placeholder="Type your doubt in any language…"></textarea>
+    <button id="aic-send" type="button" title="Send" aria-label="Send">➤</button>
+  </div>
+  <div class="aic-foot">AI help is for guidance only. Screening result is not a diagnosis. Confirm with a laboratory Hb test.</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var CK="anemiascan.chat.gemini.v1";
+/* Gemini key supplied by the owner. NOTE: anyone who opens this HTML file can read it. Restrict the key in Google AI Studio (HTTP referrer / quota) or use a Proxy URL in settings. */
+var DEFAULT_KEY="AQ.Ab8RN6Lq5cF_5KiWLJfwbXrAzpD2KtwCoWgBADL8rQhgtTb6cw";
+var DEF={key:DEFAULT_KEY,endpoint:"",model:"gemini-flash-latest",speak:true,lang:"auto"};
+var FALLBACK=["gemini-flash-latest","gemini-2.5-flash","gemini-2.0-flash"];
+var BASE="https://generativelanguage.googleapis.com/v1beta/models/";
+var cfg=loadCfg();
+var hist=[];            /* {role:"user"|"assistant", content:string} */
+var busy=false,rec=null,recOn=false,lastLang="",issue="",abortCtl=null;
+
+function g(id){return document.getElementById(id)}
+function loadCfg(){try{var o=JSON.parse(localStorage.getItem(CK));return Object.assign({},DEF,o||{})}catch(e){return Object.assign({},DEF)}}
+function saveCfg(){try{localStorage.setItem(CK,JSON.stringify(cfg))}catch(e){}}
+
+/* ---------- UI helpers ---------- */
+var msgs=g("aic-msgs");
+function add(cls,text,say){
+  var d=document.createElement("div");d.className="aic-m "+cls;d.textContent=text;
+  if(say){var b=document.createElement("button");b.type="button";b.className="aic-say";b.textContent="🔊 Listen";
+    b.onclick=function(){speak(text,say)};d.appendChild(b)}
+  msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d}
+function setBusy(v){busy=v;g("aic-send").disabled=v;g("aic-txt").disabled=v&&false}
+function openPanel(o){
+  var p=g("aic-panel");p.classList.toggle("open",o);
+  if(o){g("aic-dot").style.display="none";g("aic-txt").focus();refreshChips();if(!msgs.children.length)welcome()}
+  else{stopSpeak();stopRec()}}
+function welcome(){
+  add("b","Vanakkam! 👋 I am the AnemiaScan help assistant.\nAsk me anything about this app, an error message, or anaemia screening – in any language, by typing or by voice (🎤).\n\nவணக்கம்! இந்த ஆப் பற்றிய உங்கள் சந்தேகத்தை எந்த மொழியிலும் கேளுங்கள்.")}
+
+/* ---------- app context (no name / phone / village is ever sent) ---------- */
+function appContext(){
+  var o={};
+  try{
+    var on=document.querySelector("#nav button.on");o.activeTab=on?on.dataset.t:"unknown";
+    if(typeof S!=="undefined"&&S){
+      var p=S.patient;o.patientRegistered=!!p;
+      if(p){o.patientAge=p.age;o.patientGender=p.gender;o.pregnant=!!p.preg}
+      var sc=function(s){return s?{pallorScore:s.rejected?null:s.pallor,imageQuality:["Good","Moderate","Poor"][s.level],rejected:!!s.rejected,issues:s.issues}:"not scanned"};
+      o.nailScan=sc(S.scans&&S.scans.nail);o.eyeScan=sc(S.scans&&S.scans.eye);
+      if(S.sensor)o.hbSensor={finalHb:S.sensor.hb,status:S.sensor.status,readings:(S.sensor.reads||[]).map(function(r){return r.hb}),difference:S.sensor.diff,source:S.sensor.src};
+      o.vitalsEntered=!!S.vitals;
+    }
+    var vis=[];["patMsg","imgMsg"].forEach(function(id){var e=g(id);if(e&&e.textContent.trim())vis.push(e.textContent.trim())});
+    var t=g("toast");if(t&&t.style.display==="block"&&t.textContent.trim())vis.push(t.textContent.trim());
+    if(issue)vis.push(issue);
+    o.messagesOnScreen=vis.slice(0,5);
+  }catch(e){}
+  return o}
+
+var SYSTEM=[
+"You are the built-in help assistant of AnemiaScan (RedLens AI), a prototype non-invasive anaemia screening web app. Help users who are confused or made a mistake.",
+"APP FACTS: Tabs = Dashboard, Patient, Image scan, Hb sensor, Result, History, Hardware simulation. Workflow: register patient -> image scan (nail bed and lower eyelid) -> Hb reading -> Result -> save/print/download report.",
+"Patient tab needs Patient ID, name, valid age (0.5 to 110) and gender; pregnancy box appears only for females.",
+"Image scan: upload a photo or open camera and capture; then DRAG a box over only the pink area (nail centre or inner lower eyelid), then press Analyze region. Use even daylight, no flash, no nail polish. The box must be at least 10 px. A region is rejected if it is not red enough, has glare, deep shadow, white/shiny parts or bad exposure; then retake. Both nail and eye scans are needed for the probability score.",
+"Hb sensor tab: Hb must be between 2 and 25 g/dL; haematocrit 5-70 %; pulse 30-220 bpm; SpO2 50-100 %. Two-reading rule: take two Hb readings; if they differ by 0.2 g/dL or less, the average is used; if they differ more, retest (use Reset Hb check and start again). Manual values are tagged Manual entry. Demo and Hardware simulation values are fake DEMO / SIMULATED data, not real measurements. Real sensor needs an ESP32 sending lines like Hb:10.2 over USB serial in Chrome or Edge on localhost or https.",
+"Probability score: estimated Hb from nail and from eyelid must agree within 0.2 g/dL, otherwise the message 'Image consistency failed' appears and both images must be retaken.",
+"Results are screening indications only (rule-based colour analysis, prototype thresholds), never a diagnosis. WHO Hb cut-offs used: children under 5 y 11; 5-11 y 11.5; 12-14 y 12; non-pregnant women 12; pregnant women 11; men 13 g/dL.",
+"The CURRENT APP STATE below is JSON from the live app; use it to explain exactly what the user should fix next, in simple numbered steps.",
+"SAFETY: never diagnose, never prescribe medicine or doses. Recommend a laboratory Hb test (CBC) and a doctor for confirmation. If the user mentions chest pain, fainting, severe breathlessness, very fast heartbeat at rest, heavy bleeding or pregnancy with severe symptoms, tell them to get urgent medical care now.",
+"SCOPE: answer about this app, anaemia screening, and general anaemia/nutrition information. Politely decline unrelated topics.",
+"LANGUAGE (very important): reply in the SAME language and SAME script the user used. If the user writes Tamil (or any language) in English letters, reply the same way in English letters. If the user mixes languages, follow the main one. Use simple everyday words.",
+"FORMAT: the very first line of every reply must be exactly [[lang:XX-YY]] where XX-YY is the BCP-47 tag of the language you reply in (examples: ta-IN, hi-IN, en-US, ar-SA, es-ES). Then write the answer on the next lines. Plain text only: no markdown symbols (no **, #, backticks, tables). Keep it short; use numbered steps only when giving instructions."
+].join("\n");
+
+/* ---------- API (Google Gemini) ---------- */
+function buildBody(){
+  return {
+    systemInstruction:{parts:[{text:SYSTEM+"\n\nCURRENT APP STATE:\n"+JSON.stringify(appContext())}]},
+    contents:hist.slice(-14).map(function(m){return {role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}}),
+    generationConfig:{maxOutputTokens:2048,temperature:0.4},
+    safetySettings:["HARM_CATEGORY_HARASSMENT","HARM_CATEGORY_HATE_SPEECH","HARM_CATEGORY_SEXUALLY_EXPLICIT","HARM_CATEGORY_DANGEROUS_CONTENT"].map(function(c){return {category:c,threshold:"BLOCK_ONLY_HIGH"}})
+  }}
+function parseReply(j){
+  var txt="";
+  if(j&&Array.isArray(j.candidates)&&j.candidates[0]&&j.candidates[0].content&&Array.isArray(j.candidates[0].content.parts))
+    txt=j.candidates[0].content.parts.map(function(p){return p.text||""}).join("");
+  else if(j&&typeof j.reply==="string")txt=j.reply;
+  else if(j&&typeof j.text==="string")txt=j.text;
+  return txt}
+function callModel(model,body){
+  var url=cfg.endpoint||(BASE+encodeURIComponent(model)+":generateContent");
+  var headers={"content-type":"application/json"};
+  if(cfg.key)headers["x-goog-api-key"]=cfg.key;
+  if(!cfg.endpoint&&!cfg.key)return Promise.reject({code:"nokey"});
+  var ctl=new AbortController();abortCtl=ctl;var to=setTimeout(function(){ctl.abort()},60000);
+  return fetch(url,{method:"POST",headers:headers,body:JSON.stringify(body),signal:ctl.signal}).then(function(r){
+    clearTimeout(to);
+    return r.text().then(function(t){
+      var j=null;try{j=JSON.parse(t)}catch(e){}
+      if(!r.ok){var m=j&&j.error&&(j.error.message||j.error)||t.slice(0,200);throw {code:"http",status:r.status,msg:String(m)}}
+      var txt=parseReply(j);
+      if(!txt.trim()){
+        var br=j&&j.promptFeedback&&j.promptFeedback.blockReason;
+        throw br?{code:"blocked"}:{code:"empty"}}
+      return txt});
+  },function(e){clearTimeout(to);throw (e&&e.name==="AbortError")?{code:"timeout"}:{code:"net"}});
+}
+function callAI(){
+  var body=buildBody();
+  var list=[];[cfg.model].concat(FALLBACK).forEach(function(m){if(m&&list.indexOf(m)<0)list.push(m)});
+  if(cfg.endpoint)list=[list[0]];
+  function tryAt(i){
+    return callModel(list[i],body).catch(function(e){
+      /* wrong / retired model name -> try the next model automatically */
+      if(e&&e.code==="http"&&(e.status===404||(e.status===400&&/model/i.test(e.msg||"")&&!/api key/i.test(e.msg||"")))&&i+1<list.length)return tryAt(i+1);
+      throw e})}
+  return tryAt(0)}
+function errText(e){
+  var c=e&&e.code;
+  if(c==="nokey")return "Please add your Gemini API key (⚙ settings) or a proxy URL to start the AI help.\nAPI key (⚙ settings) kodunga, appo AI help work aagum.";
+  if(c==="timeout")return "The AI took too long. Please try again.\nNeram aachu, thirumba try pannunga.";
+  if(c==="net")return "Could not reach the AI. Check your internet connection and try again. If it keeps failing, open the page from http://localhost or https instead of a plain file.\nInternet check pannunga.";
+  if(c==="blocked")return "The AI could not answer that question. Please rephrase it.";
+  if(c==="empty")return "The AI sent an empty answer. Please ask again.";
+  if(c==="http"){
+    var m=e.msg||"";
+    if(e.status===400&&/api key|API_KEY/i.test(m))return "The Gemini API key is not valid. Please check the key in ⚙ settings.";
+    if(e.status===401||e.status===403)return "The Gemini API key was rejected or is not allowed for this site (status "+e.status+"). Check the key and its restrictions in Google AI Studio.";
+    if(e.status===429)return "Gemini limit reached right now. Wait a minute and try again.";
+    if(e.status===404||e.status===400)return "The AI request was refused ("+e.status+"). Check the model name in ⚙ settings. "+m;
+    return "AI service error ("+e.status+"). Please try again later."}
+  return "Something went wrong. Please try again."}
+
+/* ---------- send ---------- */
+function send(text){
+  text=(text||"").trim();if(!text||busy)return;
+  stopSpeak();stopRec();
+  add("u",text);hist.push({role:"user",content:text});g("aic-txt").value="";autoGrow();
+  var t=add("t","…thinking");setBusy(true);
+  callAI().then(function(raw){
+    var m=raw.match(/^\s*\[\[lang:([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)\]\]\s*/),lang="";
+    if(m){lang=m[1];raw=raw.slice(m[0].length)}
+    raw=raw.replace(/\*\*|__|`{1,3}|^#{1,6}\s*/gm,"").trim();
+    if(lang)lastLang=lang;
+    t.remove();add("b",raw,lang||lastLang||"en-US");hist.push({role:"assistant",content:raw});
+    if(cfg.speak)speak(raw,lang||lastLang||"en-US");
+  }).catch(function(e){
+    t.remove();hist.pop();add("e",errText(e));
+  }).then(function(){setBusy(false);refreshChips()});
+}
+
+/* ---------- text to speech ---------- */
+var synth=window.speechSynthesis||null;
+function stopSpeak(){try{if(synth)synth.cancel()}catch(e){}}
+function pickVoice(lang){
+  if(!synth)return null;var vs=synth.getVoices()||[],p=lang.split("-")[0].toLowerCase(),i;
+  for(i=0;i<vs.length;i++)if(vs[i].lang.replace("_","-").toLowerCase()===lang.toLowerCase())return vs[i];
+  for(i=0;i<vs.length;i++)if(vs[i].lang.toLowerCase().indexOf(p)===0)return vs[i];
+  return null}
+function chunks(t){
+  var out=[],parts=t.replace(/\s+/g," ").match(/[^.!?।。؟\n]+[.!?।。؟]*/g)||[t],cur="";
+  parts.forEach(function(s){if((cur+s).length>170&&cur){out.push(cur);cur=s}else cur+=s});
+  if(cur.trim())out.push(cur);return out}
+function speak(text,lang){
+  if(!synth||!text)return;stopSpeak();lang=lang||"en-US";
+  var clean=text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,"");
+  var v=pickVoice(lang);
+  chunks(clean).forEach(function(c){var u=new SpeechSynthesisUtterance(c);u.lang=v?v.lang:lang;if(v)u.voice=v;u.rate=0.95;synth.speak(u)})}
+if(synth&&synth.addEventListener)synth.addEventListener("voiceschanged",function(){});
+
+/* ---------- voice input ---------- */
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+function recLang(){
+  if(cfg.lang&&cfg.lang!=="auto")return cfg.lang;
+  return lastLang||navigator.language||"en-US"}
+function stopRec(){recOn=false;g("aic-mic").classList.remove("rec");try{rec&&rec.stop()}catch(e){}}
+function startRec(){
+  if(!SR){add("e","Voice input is not supported in this browser. Please use Chrome, Edge or Safari, or type your question.");return}
+  if(busy)return;
+  if(recOn){stopRec();return}
+  stopSpeak();
+  try{
+    rec=new SR();rec.lang=recLang();rec.interimResults=true;rec.continuous=false;rec.maxAlternatives=1;
+    var finalT="";
+    rec.onstart=function(){recOn=true;g("aic-mic").classList.add("rec");g("aic-txt").placeholder="Listening… ("+rec.lang+")"};
+    rec.onresult=function(ev){
+      var interim="";finalT="";
+      for(var i=0;i<ev.results.length;i++){var r=ev.results[i];if(r.isFinal)finalT+=r[0].transcript;else interim+=r[0].transcript}
+      g("aic-txt").value=(finalT+interim).trim();autoGrow()};
+    rec.onerror=function(ev){
+      var m={"not-allowed":"Microphone permission is blocked. Allow the microphone and use https or localhost.","service-not-allowed":"Microphone permission is blocked. Allow the microphone and use https or localhost.",
+        "no-speech":"I did not hear anything. Tap 🎤 and speak again.","audio-capture":"No microphone found.","network":"Voice service needs internet.","language-not-supported":"This language is not supported for voice input. Pick another in ⚙ settings or type."}[ev.error];
+      if(m&&ev.error!=="aborted")add("e",m)};
+    rec.onend=function(){recOn=false;g("aic-mic").classList.remove("rec");g("aic-txt").placeholder="Type your doubt in any language…";
+      var v=g("aic-txt").value.trim();if(v&&finalT.trim())send(v)};
+    rec.start();
+  }catch(e){recOn=false;add("e","Could not start the microphone. Please try again.")}}
+
+/* ---------- chips + auto help on error messages ---------- */
+var CHIPS=["How do I use this app?","Image scan eppadi edukkanum?","Hb retest-nu varudhu, enna pannanum?","Anaemia na enna?","இந்த result-ஐ எப்படி புரிந்து கொள்வது?"];
+function refreshChips(){
+  var c=g("aic-chips");c.innerHTML="";
+  if(issue){var b=document.createElement("button");b.type="button";b.className="hot";b.textContent="❓ Explain this message";
+    b.onclick=function(){var q="Please explain this message from the app and tell me exactly what to do: "+issue;issue="";send(q)};c.appendChild(b)}
+  CHIPS.forEach(function(t){var b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=function(){send(t)};c.appendChild(b)})}
+function watch(id){
+  var el=g(id);if(!el||!window.MutationObserver)return;
+  new MutationObserver(function(){
+    var t=(el.textContent||"").trim();
+    var bad=id==="toast"?(el.style.display==="block"&&/(must|could not|retest|differ|enter|not supported|too|nothing|no records)/i.test(t)):el.classList.contains("e");
+    if(bad&&t&&t!==issue){issue=t;if(!g("aic-panel").classList.contains("open"))g("aic-dot").style.display="block";else refreshChips()}
+  }).observe(el,{childList:true,characterData:true,subtree:true,attributes:true,attributeFilter:["class","style"]})}
+["patMsg","imgMsg","toast"].forEach(watch);
+
+/* ---------- settings ---------- */
+function fillSet(){g("aic-key").value=cfg.key||"";g("aic-ep").value=cfg.endpoint||"";g("aic-model").value=cfg.model||"";g("aic-lang").value=cfg.lang||"auto"}
+function spkUi(){var b=g("aic-spk");b.textContent=cfg.speak?"🔊":"🔇";b.classList.toggle("off",!cfg.speak)}
+function autoGrow(){var t=g("aic-txt");t.style.height="auto";t.style.height=Math.min(t.scrollHeight,90)+"px"}
+
+g("aic-fab").onclick=function(){openPanel(!g("aic-panel").classList.contains("open"))};
+g("aic-x").onclick=function(){openPanel(false)};
+g("aic-gear").onclick=function(){g("aic-set").classList.toggle("open")};
+g("aic-new").onclick=function(){stopSpeak();stopRec();hist=[];msgs.innerHTML="";welcome()};
+g("aic-spk").onclick=function(){cfg.speak=!cfg.speak;if(!cfg.speak)stopSpeak();saveCfg();spkUi()};
+g("aic-save").onclick=function(){
+  cfg.key=g("aic-key").value.trim();cfg.endpoint=g("aic-ep").value.trim();cfg.model=g("aic-model").value.trim()||DEF.model;cfg.lang=g("aic-lang").value;
+  saveCfg();g("aic-set").classList.remove("open");add("b","Settings saved ✔")};
+g("aic-send").onclick=function(){send(g("aic-txt").value)};
+g("aic-mic").onclick=startRec;
+g("aic-txt").addEventListener("input",autoGrow);
+g("aic-txt").addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send(g("aic-txt").value)}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&g("aic-panel").classList.contains("open"))openPanel(false)});
+window.addEventListener("beforeunload",function(){stopSpeak()});
+if(!SR)g("aic-mic").title="Voice input not supported in this browser";
+fillSet();spkUi();
+})();
+</script>
+</body>
+</html>
